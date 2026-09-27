@@ -1,0 +1,8 @@
+plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+android {
+ namespace 'com.smartpos'
+ compileSdk 34
+ defaultConfig { applicationId "com.smartpos"; minSdk 24; targetSdk 34; versionCode 14; versionName "1.0-SMART-POS-13-GREEN" }
+ buildTypes { release { minifyEnabled false } }
+}
+dependencies { implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.google.android.material:material:1.11.0' }
