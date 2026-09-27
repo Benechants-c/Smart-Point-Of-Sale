@@ -1,18 +1,24 @@
-name: SMART POS Build
+name: Build SMART POS APK
 on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: GREEN RESTORE
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Make gradlew executable
+        run: chmod +x gradlew || echo "no wrapper"
+      - name: Build APK
         run: |
-          echo "SMART POS v9 - GREEN RESTORED"
-          echo "Build #7 was GREEN - restoring that logic"
-          ls app/src/main/java/com/smartpos/
-          echo "Commercial Core: PRESENT ✅"
-      - name: Upload Source
+         ./gradlew assembleDebug --stacktrace || gradle assembleDebug --stacktrace
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SMART-POS-v9-GREEN
-          path: app/
+          name: SMART-POS-APK-12-GREEN
+          path: app/build/outputs/apk/debug/
