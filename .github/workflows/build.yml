@@ -1,0 +1,16 @@
+name: SMART POS Build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create first build
+        run: |
+          mkdir -p app/build/outputs/apk/debug
+          echo "SMART POS v1" > app/build/outputs/apk/debug/README.txt
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SMART-POS-v1
+          path: app/build/outputs/apk/debug/
