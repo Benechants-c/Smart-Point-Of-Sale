@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.smartpos'
+    namespace 'com.smartpos'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.smartpos"
+        applicationId "com.smartpos"
         minSdk 21
         targetSdk 34
         versionCode 1
@@ -22,17 +22,13 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    
-    // FIXED - BOTH 17 - SAME VERSION!
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    
     kotlinOptions {
         jvmTarget = '17'
     }
-    
     buildFeatures {
         viewBinding true
     }
