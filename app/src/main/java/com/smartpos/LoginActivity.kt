@@ -16,7 +16,7 @@ class LoginActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pref = getSharedPreferences("smartshop_final", 0)
+        pref = getSharedPreferences("smartshop_fix", 0)
         load()
         login()
     }
@@ -41,7 +41,7 @@ class LoginActivity : Activity() {
 
     fun login() {
         val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(60,250,60,60); gravity = Gravity.CENTER; setBackgroundColor(0xFF0A1931.toInt()) }
-        val t = TextView(this).apply { text = "SmartShop POS\nSHOP001-HRE\nHarare"; textSize = 22f; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.CENTER; setPadding(0,0,0,40) }
+        val t = TextView(this).apply { text = "SmartShop POS\nSHOP001-HRE"; textSize = 22f; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.CENTER }
         val pin = EditText(this).apply { hint = "PIN 1234"; inputType = 129; setBackgroundColor(0xFFFFFFFF.toInt()) }
         val btn = Button(this).apply { text = "LOGIN"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
         btn.setOnClickListener { if (pin.text.toString()=="1234") receivingUI() else Toast.makeText(this,"1234",Toast.LENGTH_SHORT).show() }
@@ -50,138 +50,120 @@ class LoginActivity : Activity() {
     }
 
     fun receivingUI() {
-        // Main container
-        val root = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(0xFFF1F5F9.toInt()) }
-
-        // LEFT SIDEBAR - YOUR OWN MENU
-        val sidebar = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF0A1931.toInt())
-            setPadding(10, 20, 10, 20)
-        }
-        val menu = arrayOf("🏠\nHome", "🛒\nSales", "🚚\nReceiving", "📦\nStock", "👥\nSuppliers", "📊\nReports", "⚙️\nSettings")
-        for (m in menu) {
-            val tv = TextView(this).apply {
-                text = m
-                setTextColor(if (m.contains("Receiving")) 0xFFFFFFFF.toInt() else 0xFF94A3B8.toInt())
-                setBackgroundColor(if (m.contains("Receiving")) 0xFF185ADB.toInt() else 0x00000000)
-                gravity = Gravity.CENTER
-                setPadding(15, 25, 15, 25)
-                textSize = 11f
-            }
-            sidebar.addView(tv)
-        }
-
-        // RIGHT CONTENT
         val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(10, 10, 10, 10) }
+        val main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,12,12,12); setBackgroundColor(0xFFF1F5F9.toInt()) }
 
-        // TOP BAR
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+        val top = TextView(this).apply {
+            text = " SmartShop POS - Receiving (USD) | SHOP001-HRE"
             setBackgroundColor(0xFF185ADB.toInt())
-            setPadding(15, 15, 15, 15)
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(15,15,15,15)
+            textSize = 14f
         }
-        val topTitle = TextView(this).apply { text = "🛒 SmartShop POS"; setTextColor(0xFFFFFFFF.toInt()); textSize = 16f }
-        val topDate = TextView(this).apply { text = " 27 Sep 2026 10:24"; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.RIGHT }
-        topBar.addView(topTitle); topBar.addView(topDate)
+        val title = TextView(this).apply { text = "Receiving"; textSize = 20f; setPadding(10,15,10,10) }
 
-        // RECEIVING TITLE
-        val titleRec = TextView(this).apply { text = "Receiving"; textSize = 20f; setPadding(10, 15, 10, 15); setTextColor(0xFF0A1931.toInt()) }
+        // --- SUPPLIER CARD WITH HEADINGS ON TOP ---
+        val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(12,12,12,12) }
 
-        // FORM CARD - YOUR OWN FIELDS (EMPTY)
-        val formCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(12, 12, 12, 12) }
-        val rowLabels = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        rowLabels.addView(TextView(this).apply { text = "Supplier"; textSize = 11f; setPadding(0,0,40,0) })
-        rowLabels.addView(TextView(this).apply { text = "Invoice No."; textSize = 11f; setPadding(0,0,40,0) })
-        rowLabels.addView(TextView(this).apply { text = "Date"; textSize = 11f; setPadding(0,0,60,0) })
-        rowLabels.addView(TextView(this).apply { text = "Reference / PO No."; textSize = 11f })
-
-        val rowInputs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val hSup = TextView(this).apply { text = "Supplier"; textSize = 12f; setTextColor(0xFF475569.toInt()) }
         val sp = Spinner(this)
-        val supList = arrayOf("Select Supplier", "Harare Wholesalers", "ZimBake", "ColdChain ZW", "My Supplier")
-        sp.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, supList)
+        val sups = arrayOf("Select Supplier", "Harare Wholesalers", "ZimBake", "ColdChain ZW", "My Supplier")
+        sp.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sups)
         sp.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(a: AdapterView<*>?, v: android.view.View?, p: Int, id: Long) { supplier = supList[p] }
+            override fun onItemSelected(a: AdapterView<*>?, v: android.view.View?, p: Int, id: Long) { supplier = sups[p] }
             override fun onNothingSelected(a: AdapterView<*>?) {}
         }
-        val eInv = EditText(this).apply { hint = "Enter Invoice No."; textSize = 12f }
-        val eDate = EditText(this).apply { hint = "27/09/2026"; textSize = 12f }
-        val eRef = EditText(this).apply { hint = "Enter PO No."; textSize = 12f }
-        rowInputs.addView(sp); rowInputs.addView(eInv); rowInputs.addView(eDate); rowInputs.addView(eRef)
 
-        val lblScan = TextView(this).apply { text = "Scan or Enter Product Code / Name"; textSize = 12f; setPadding(0,15,0,5) }
-        val eSearch = EditText(this).apply { hint = "Search by code or product name..."; setBackgroundColor(0xFFFFFFFF.toInt()) }
+        val hInv = TextView(this).apply { text = "Invoice No."; textSize = 12f; setPadding(0,10,0,0) }
+        val eInv = EditText(this).apply { hint = "Enter Invoice No." }
+        val hDate = TextView(this).apply { text = "Date"; textSize = 12f; setPadding(0,10,0,0) }
+        val eDate = EditText(this).apply { hint = "27/09/2026" }
+        val hRef = TextView(this).apply { text = "Reference / PO No."; textSize = 12f; setPadding(0,10,0,0) }
+        val eRef = EditText(this).apply { hint = "Enter PO No." }
 
-        // PRODUCT INPUT ROW - YOUR OWN
-        val inputRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0,10,0,0) }
-        val eName = EditText(this).apply { hint = "Product Name"; textSize = 11f }
-        val eCode = EditText(this).apply { hint = "Code"; textSize = 11f }
-        val eCost = EditText(this).apply { hint = "Cost (USD)"; inputType = 8194; textSize = 11f }
-        val eSell = EditText(this).apply { hint = "Selling (USD)"; inputType = 8194; textSize = 11f }
-        val eQty = EditText(this).apply { hint = "Qty"; inputType = 2; textSize = 11f }
-        inputRow.addView(eName); inputRow.addView(eCode); inputRow.addView(eCost); inputRow.addView(eSell); inputRow.addView(eQty)
+        card.addView(hSup); card.addView(sp)
+        card.addView(hInv); card.addView(eInv)
+        card.addView(hDate); card.addView(eDate)
+        card.addView(hRef); card.addView(eRef)
 
-        val btnAdd = Button(this).apply { text = "+ Add Item"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()); textSize = 12f }
+        // --- PRODUCT ENTRY WITH HEADINGS READ ONLY ON TOP ---
+        val prodCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(12,12,12,12); setPadding(0,15,0,0) }
+        val hScan = TextView(this).apply { text = "Scan or Enter Product Code / Name"; textSize = 12f; setPadding(0,5,0,5) }
+        val eSearch = EditText(this).apply { hint = "Search by code or name..." }
 
-        // TABLE HEADER - SAME LAYOUT, USD
-        val tableHeader = TextView(this).apply {
-            text = "# | Product Name | Code | Cost (USD) | Selling (USD) | Qty | Total (USD) | Action"
+        // Headings remain READ ONLY
+        val lName = TextView(this).apply { text = "Product Name"; textSize = 12f; setTextColor(0xFF0F172A.toInt()); setPadding(0,12,0,2) }
+        val eName = EditText(this).apply { hint = "Enter under Product Name heading" }
+
+        val lCode = TextView(this).apply { text = "Code"; textSize = 12f; setPadding(0,10,0,2) }
+        val eCode = EditText(this).apply { hint = "Enter under Code heading" }
+
+        val lCost = TextView(this).apply { text = "Cost (USD)"; textSize = 12f; setPadding(0,10,0,2) }
+        val eCost = EditText(this).apply { hint = "e.g. 2.50"; inputType = 8194 }
+
+        val lSell = TextView(this).apply { text = "Selling Price (USD)"; textSize = 12f; setPadding(0,10,0,2) }
+        val eSell = EditText(this).apply { hint = "e.g. 4.00"; inputType = 8194 }
+
+        val lQty = TextView(this).apply { text = "Qty"; textSize = 12f; setPadding(0,10,0,2) }
+        val eQty = EditText(this).apply { hint = "e.g. 10"; inputType = 2 }
+
+        val btnAdd = Button(this).apply { text = "+ Add Item"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
+
+        prodCard.addView(hScan); prodCard.addView(eSearch)
+        prodCard.addView(lName); prodCard.addView(eName)
+        prodCard.addView(lCode); prodCard.addView(eCode)
+        prodCard.addView(lCost); prodCard.addView(eCost)
+        prodCard.addView(lSell); prodCard.addView(eSell)
+        prodCard.addView(lQty); prodCard.addView(eQty)
+        prodCard.addView(btnAdd)
+
+        // --- TABLE HEADER READ ONLY ---
+        val th = TextView(this).apply {
+            text = "# Product Name | Code | Cost USD | Sell USD | Qty | Total USD"
             setBackgroundColor(0xFFE8F0FE.toInt())
-            setPadding(8,10,8,10)
-            textSize = 10f
+            setPadding(8,12,8,12)
+            textSize = 11f
         }
-        val tvTable = TextView(this).apply {
-            text = "No items yet. Add your products above."
-            setBackgroundColor(0xFFFFFFFF.toInt())
-            setPadding(10,15,10,15)
-            textSize = 12f
-        }
-        val tvGrand = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.RIGHT; setPadding(10,15,10,15); setBackgroundColor(0xFFF1F5F9.toInt()) }
-        val tvCount = TextView(this).apply { text = "Total Items: 0 "; textSize = 12f }
-        val tvTotal = TextView(this).apply { text = "Grand Total (USD): $0.00"; textSize = 16f; setTextColor(0xFF185ADB.toInt()) }
-        tvGrand.addView(tvCount); tvGrand.addView(tvTotal)
+        val tvTable = TextView(this).apply { text = "No items yet"; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(10,15,10,15) }
+        val tvGrand = TextView(this).apply { text = "Total Items: 0 | Grand Total (USD): $0.00"; gravity = Gravity.RIGHT; setPadding(10,15,10,15); textSize = 15f; setTextColor(0xFF185ADB.toInt()) }
 
-        // BOTTOM BUTTONS - SAME LAYOUT
-        val bottomRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(10,15,0,0) }
-        val btnClear = Button(this).apply { text = "Clear"; setBackgroundColor(0xFF94A3B8.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-        val btnDraft = Button(this).apply { text = "Save Draft"; setBackgroundColor(0xFF16A34A.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-        val btnPost = Button(this).apply { text = "✓ Post Receiving"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-        bottomRow.addView(btnClear); bottomRow.addView(btnDraft); bottomRow.addView(btnPost)
+        val bottom = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(0,15,0,0) }
+        val bClear = Button(this).apply { text = "Clear"; setBackgroundColor(0xFF94A3B8.toInt()) }
+        val bDraft = Button(this).apply { text = "Save Draft"; setBackgroundColor(0xFF16A34A.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
+        val bPost = Button(this).apply { text = "Post Receiving"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
+        bottom.addView(bClear); bottom.addView(bDraft); bottom.addView(bPost)
 
         fun refresh() {
             if (list.isEmpty()) {
-                tvTable.text = "No items yet. Add your products above."
-                tvCount.text = "Total Items: 0 "
-                tvTotal.text = "Grand Total (USD): $0.00"
+                tvTable.text = "No items yet"
+                tvGrand.text = "Total Items: 0 | Grand Total (USD): $0.00"
                 return
             }
             var txt = ""; var grand = 0.0; var i = 1
             for (it in list) {
                 val tot = it.cost * it.qty
-                txt += i.toString() + " | " + it.name + " | " + it.code + " | $" + it.cost + " | $" + it.sell + " | " + it.qty + " | $" + String.format("%.2f", tot) + " | [X]\n"
+                txt += i.toString() + " " + it.name + " " + it.code + " $" + it.cost + " $" + it.sell + " x" + it.qty + " = $" + String.format("%.2f", tot) + "\n"
                 grand += tot; i++
             }
             tvTable.text = txt
-            tvCount.text = "Total Items: " + list.size + " "
-            tvTotal.text = "Grand Total (USD): $" + String.format("%.2f", grand)
+            tvGrand.text = "Total Items: " + list.size + " | Grand Total (USD): $" + String.format("%.2f", grand)
         }
 
         btnAdd.setOnClickListener {
             if (eName.text.isEmpty() || eCode.text.isEmpty() || eCost.text.isEmpty() || eSell.text.isEmpty() || eQty.text.isEmpty()) {
-                Toast.makeText(this, "Fill all: Name, Code, Cost USD, Selling USD, Qty", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Fill all fields under headings", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             try {
                 val c = eCost.text.toString().toDouble(); val s = eSell.text.toString().toDouble()
-                if (s < c) { Toast.makeText(this, "Selling $" + s + " cannot be < Cost $" + c, Toast.LENGTH_LONG).show(); return@setOnClickListener }
+                if (s < c) { Toast.makeText(this, "Selling < Cost - Loss!", Toast.LENGTH_LONG).show(); return@setOnClickListener }
                 list.add(Item(eName.text.toString(), eCode.text.toString().uppercase(), c, s, eQty.text.toString().toInt()))
                 refresh()
                 eName.text.clear(); eCode.text.clear(); eCost.text.clear(); eSell.text.clear(); eQty.text.clear()
             } catch (e: Exception) { Toast.makeText(this, "Check numbers", Toast.LENGTH_SHORT).show() }
         }
-        btnClear.setOnClickListener { list.clear(); refresh() }
-        btnPost.setOnClickListener {
+        bClear.setOnClickListener { list.clear(); refresh() }
+        bPost.setOnClickListener {
             if (list.isEmpty()) return@setOnClickListener
             for (it in list) {
                 val ex = stock[it.code]
@@ -189,16 +171,12 @@ class LoginActivity : Activity() {
                 else stock[it.code] = it
             }
             save()
-            Toast.makeText(this, "Posted " + list.size + " items from " + supplier + " to Stock (USD)", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Posted " + list.size + " items (USD) from " + supplier, Toast.LENGTH_LONG).show()
             list.clear(); refresh()
         }
 
-        formCard.addView(rowLabels); formCard.addView(rowInputs); formCard.addView(lblScan); formCard.addView(eSearch)
-        content.addView(topBar); content.addView(titleRec); content.addView(formCard); content.addView(inputRow); content.addView(btnAdd)
-        content.addView(tableHeader); content.addView(tvTable); content.addView(tvGrand); content.addView(bottomRow)
-
-        scroll.addView(content)
-        root.addView(sidebar); root.addView(scroll)
-        setContentView(root)
+        main.addView(top); main.addView(title); main.addView(card); main.addView(prodCard); main.addView(th); main.addView(tvTable); main.addView(tvGrand); main.addView(bottom)
+        scroll.addView(main)
+        setContentView(scroll)
     }
 }
