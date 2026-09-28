@@ -8,104 +8,205 @@ import android.view.View
 import android.content.SharedPreferences
 import android.text.Editable
 import android.text.TextWatcher
-import java.text.SimpleDateFormat
 import java.util.*
 
 class LoginActivity : Activity() {
     lateinit var pref: SharedPreferences
-    var stock = mutableMapOf<String, Item>()
-    var cart = mutableListOf<Item>()
-    var sales = mutableListOf<Sale>()
-    var selectedPay = "Cash"
+    var stock = HashMap<String, Item>()
+    var cart = ArrayList<Item>()
     data class Item(var name: String, var code: String, var cost: Double, var sell: Double, var qty: Int)
-    data class Sale(var date: String, var total: Double, var items: String)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pref = getSharedPreferences("pos_v15", 0)
-        load(); login()
+        pref = getSharedPreferences("pos", 0)
+        stock["1002"] = Item("milk","1002",0.7,1.0,50)
+        stock["1003"] = Item("dovi","1003",2.0,3.0,20)
+        stock["CC500"] = Item("Coca Cola","CC500",0.7,1.0,50)
+        stock["BRD001"] = Item("Bread","BRD001",1.2,1.5,20)
+        login()
     }
-    fun load() {
-        val s = pref.getString("stock", "")?: ""
-        if (s.isNotEmpty()) for (row in s.split(";;")) { val p=row.split("|"); if(p.size==5) stock[p[1]]=Item(p[0],p[1],p[2].toDoubleOrNull()?:0.0,p[3].toDoubleOrNull()?:0.0,p[4].toIntOrNull()?:0) }
-        if (stock.isEmpty()) { stock["1002"]=Item("milk","1002",0.7,1.0,50); stock["1003"]=Item("dovi","1003",2.0,3.0,20); stock["CC500"]=Item("Coca Cola","CC500",0.7,1.0,50) }
-        val sl = pref.getString("sales", "")?: ""
-        if (sl.isNotEmpty()) for (row in sl.split(";;")) { val p=row.split("||"); if(p.size==3) sales.add(Sale(p[0],p[1].toDoubleOrNull()?:0.0,p[2])) }
-    }
-    fun saveAll() {
-        pref.edit().putString("stock", stock.values.joinToString(";;"){it.name+"|"+it.code+"|"+it.cost+"|"+it.sell+"|"+it.qty}).apply()
-        pref.edit().putString("sales", sales.joinToString(";;"){it.date+"||"+it.total+"||"+it.items}).apply()
-    }
-    fun login() {
-        val lay = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(60,200,60,60); gravity=Gravity.CENTER; setBackgroundColor(0xFF0A1931.toInt()) }
-        val t = TextView(this).apply { text="SmartShop POS"; textSize=22f; setTextColor(0xFFFFFFFF.toInt()); gravity=Gravity.CENTER }
-        val pin = EditText(this).apply { hint="PIN 0000 Cashier / 1234 Admin"; inputType=129; setBackgroundColor(0xFFFFFFFF.toInt()) }
-        val btn = Button(this).apply { text="LOGIN"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-        btn.setOnClickListener {
-            val p = pin.text.toString()
-            if(p=="0000") dashboard(false)
-            else if(p=="1234") dashboard(true)
-            else Toast.makeText(applicationContext,"0000 Cashier 1234 Admin",Toast.LENGTH_SHORT).show()
+
+    fun login(){
+        val lay = LinearLayout(this)
+        lay.orientation = LinearLayout.VERTICAL
+        lay.setPadding(60,200,60,60)
+        lay.gravity = Gravity.CENTER
+        val t = TextView(this)
+        t.text = "SmartShop POS\n0000 Cashier"
+        t.gravity = Gravity.CENTER
+        val pin = EditText(this)
+        pin.hint = "PIN 0000"
+        val btn = Button(this)
+        btn.text = "LOGIN"
+        btn.setOnClickListener{
+            if(pin.text.toString()=="0000" || pin.text.toString()=="1234"){
+                dashboard()
+            }
         }
-        lay.addView(t); lay.addView(pin); lay.addView(btn); setContentView(lay)
+        lay.addView(t)
+        lay.addView(pin)
+        lay.addView(btn)
+        setContentView(lay)
     }
 
-    fun dashboard(isAdmin: Boolean) {
-        val root = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-        val drawer = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(0xFF0A1931.toInt()); layoutParams=LinearLayout.LayoutParams(200, LinearLayout.LayoutParams.MATCH_PARENT) }
-        val scrollContent = ScrollView(this).apply { layoutParams=LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); setBackgroundColor(0xFFF1F5F9.toInt()) }
-        val content = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(6,6,6,6) }
+    fun dashboard(){
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        content.setPadding(8,8,8,8)
 
-        fun showHome() {
-            drawer.visibility=View.VISIBLE
-            content.removeAllViews()
-            content.addView(TextView(this).apply { text="HOME\nToday sales: ${sales.size}\n\nUse 0000 for Cashier\n1234 for Admin"; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(15,15,15,15) })
+        val eSearch = EditText(this)
+        eSearch.hint = "Enter code or name"
+
+        val btnSearch = Button(this)
+        btnSearch.text = "SEARCH ADD"
+
+        val cartBox = LinearLayout(this)
+        cartBox.orientation = LinearLayout.VERTICAL
+
+        val tvTot = TextView(this)
+        tvTot.text = "Total 0.00"
+        tvTot.textSize = 20f
+        tvTot.gravity = Gravity.RIGHT
+
+        val eRec = EditText(this)
+        eRec.hint = "Amount Received"
+        eRec.inputType = 8194
+
+        val tvChange = TextView(this)
+        tvChange.text = "Change: 0.00"
+        tvChange.textSize = 22f
+        tvChange.gravity = Gravity.RIGHT
+
+        val bComplete = Button(this)
+        bComplete.text = "COMPLETE SALE"
+
+        val payRow = LinearLayout(this)
+        payRow.orientation = LinearLayout.HORIZONTAL
+        val bCash = Button(this); bCash.text = "CASH"
+        val bEco = Button(this); bEco.text = "ECOCASH"
+        payRow.addView(bCash, LinearLayout.LayoutParams(0, -2, 1f))
+        payRow.addView(bEco, LinearLayout.LayoutParams(0, -2, 1f))
+
+        fun getTotal(): Double {
+            var s = 0.0
+            for(it in cart){ s = s + it.sell * it.qty }
+            return s
         }
-        fun showSimple(txt: String) {
-            drawer.visibility=View.VISIBLE
-            content.removeAllViews()
-            content.addView(TextView(this).apply { text=txt; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(15,15,15,15) })
+
+        fun refresh(){
+            cartBox.removeAllViews()
+            var sub = 0.0
+            var idx = 1
+            for(item in cart){
+                val tot = item.sell * item.qty
+                sub = sub + tot
+                val row = LinearLayout(this)
+                row.orientation = LinearLayout.HORIZONTAL
+                val tv1 = TextView(this); tv1.text = idx.toString()
+                tv1.layoutParams = LinearLayout.LayoutParams(0, -2, 0.3f)
+                val tv2 = TextView(this); tv2.text = item.name
+                tv2.layoutParams = LinearLayout.LayoutParams(0, -2, 2f)
+                val box = LinearLayout(this)
+                box.orientation = LinearLayout.HORIZONTAL
+                box.layoutParams = LinearLayout.LayoutParams(0, -2, 1.5f)
+                val bm = Button(this); bm.text = "-"
+                val tq = TextView(this); tq.text = item.qty.toString(); tq.gravity = Gravity.CENTER
+                val bp = Button(this); bp.text = "+"
+                box.addView(bm); box.addView(tq); box.addView(bp)
+                val tv5 = TextView(this); tv5.text = String.format("%.2f", tot)
+                tv5.layoutParams = LinearLayout.LayoutParams(0, -2, 0.8f)
+                val del = Button(this); del.text = "X"
+                del.layoutParams = LinearLayout.LayoutParams(0, -2, 0.4f)
+
+                bm.setOnClickListener{
+                    if(item.qty > 1){
+                        item.qty = item.qty - 1
+                        refresh()
+                    }
+                }
+                bp.setOnClickListener{
+                    item.qty = item.qty + 1
+                    refresh()
+                }
+                del.setOnClickListener{
+                    cart.remove(item)
+                    refresh()
+                }
+                row.addView(tv1); row.addView(tv2); row.addView(box); row.addView(tv5); row.addView(del)
+                cartBox.addView(row)
+                idx = idx + 1
+            }
+            tvTot.text = "Total " + String.format("%.2f", sub)
+            val rec = eRec.text.toString().toDoubleOrNull()
+            var r = 0.0
+            if(rec!= null){ r = rec }
+            tvChange.text = "Change: " + String.format("%.2f", r - sub)
         }
 
-        fun showSales() {
-            // 1) HIDE DRAWER FOR CASHIER
-            if(!isAdmin) drawer.visibility=View.GONE else drawer.visibility=View.GONE
+        btnSearch.setOnClickListener{
+            val q = eSearch.text.toString().trim()
+            if(q.length == 0) return@setOnClickListener
+            for(k in stock.keys){
+                val it = stock[k]
+                if(it!= null){
+                    if(it.code.toLowerCase().contains(q.toLowerCase()) || it.name.toLowerCase().contains(q.toLowerCase())){
+                        var found = false
+                        for(c in cart){
+                            if(c.code == it.code){
+                                c.qty = c.qty + 1
+                                found = true
+                            }
+                        }
+                        if(!found){
+                            cart.add(Item(it.name, it.code, it.cost, it.sell, 1))
+                        }
+                        eSearch.setText("")
+                        refresh()
+                        break
+                    }
+                }
+            }
+        }
 
-            content.removeAllViews()
+        eRec.addTextChangedListener(object: TextWatcher{
+            override fun afterTextChanged(s: Editable?){
+                refresh()
+            }
+            override fun beforeTextChanged(a: CharSequence?, b: Int, c: Int, d: Int){}
+            override fun onTextChanged(a: CharSequence?, b: Int, c: Int, d: Int){}
+        })
 
-            val topBar = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-            val title = TextView(this).apply { text="SALES"; textSize=14f; layoutParams=LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
-            val btnBack = Button(this).apply { text="ADMIN"; textSize=10f }
-            btnBack.setOnClickListener { showHome() }
-            topBar.addView(title)
-            if(isAdmin) topBar.addView(btnBack)
-            content.addView(topBar)
+        bComplete.setOnClickListener{
+            val tot = getTotal()
+            if(cart.size == 0) return@setOnClickListener
+            val recStr = eRec.text.toString()
+            var rec = 0.0
+            if(recStr.length > 0){
+                val v = recStr.toDoubleOrNull()
+                if(v!= null) rec = v
+            }
+            if(rec < tot){
+                Toast.makeText(this, "Less amount", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            cart.clear()
+            eRec.setText("")
+            refresh()
+            Toast.makeText(this, "Change " + String.format("%.2f", rec - tot), Toast.LENGTH_LONG).show()
+        }
 
-            val top = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-            val eSearch = EditText(this).apply { hint="Scan barcode or enter product..."; setBackgroundColor(0xFFFFFFFF.toInt()) }
-            val btnSearch = Button(this).apply { text="SEARCH"; setBackgroundColor(0xFF185ADB.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-            top.addView(eSearch, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0,0,6,0) })
-            top.addView(btnSearch)
-            content.addView(top)
+        content.addView(eSearch)
+        content.addView(btnSearch)
+        content.addView(cartBox)
+        content.addView(tvTot)
+        content.addView(payRow)
+        content.addView(eRec)
+        content.addView(tvChange)
+        content.addView(bComplete)
 
-            val header = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; setBackgroundColor(0xFFE2E8F0.toInt()); setPadding(4,8,4,8) }
-            fun mkHd(s: String, w: Float): TextView { val tv=TextView(this); tv.text=s; tv.textSize=10f; tv.layoutParams=LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, w); return tv }
-            header.addView(mkHd("#",0.3f)); header.addView(mkHd("Name",2f)); header.addView(mkHd("Code",1f)); header.addView(mkHd("Qty",1.6f)); header.addView(mkHd("Price",0.8f)); header.addView(mkHd("Total",0.8f)); header.addView(mkHd("X",0.4f))
-            content.addView(header)
-
-            val cartBox = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(0xFFFFFFFF.toInt()) }
-            content.addView(cartBox)
-
-            val sumBox = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(0xFFFFFFFF.toInt()); setPadding(8,8,8,8) }
-            val tvSub = TextView(this).apply { text="Subtotal 0.00"; gravity=Gravity.RIGHT }
-            val tvTot = TextView(this).apply { text="Total 0.00"; textSize=18f; setBackgroundColor(0xFF1E3A5F.toInt()); setTextColor(0xFFFFFFFF.toInt()); setPadding(10,10,10,10); gravity=Gravity.RIGHT }
-            val payRow = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-            val bCash = Button(this).apply { text="CASH"; setBackgroundColor(0xFF16A34A.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-            val bEco = Button(this).apply { text="ECOCASH"; setBackgroundColor(0xFF7C3AED.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-            payRow.addView(bCash, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0,0,4,0) })
-            payRow.addView(bEco, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            val eRec = EditText(this).apply { hint="Amount Received"; inputType=8194 }
-            val tvChange = TextView(this).apply { text="Change: 0.00"; setBackgroundColor(0xFFDCFCE7.toInt()); setPadding(10,10,10,10); gravity=Gravity.RIGHT; textSize=18f }
-            val bComplete = Button(this).apply { text="COMPLETE SALE"; setBackgroundColor(0xFF16A34A.toInt()); setTextColor(0xFFFFFFFF.toInt()) }
-
-            sumBox.addView(tvSub); sumBox.addView(tvTot); sumBox.addView(TextView(this).apply { text="Payment Method" }); sumBox.addView(payRow); sumBox.addView(eRec); sumBox.addView(tvChange); sumBox.addView(bComplete)
+        val scroll = ScrollView(this)
+        scroll.addView(content)
+        setContentView(scroll)
+        refresh()
+    }
+}
