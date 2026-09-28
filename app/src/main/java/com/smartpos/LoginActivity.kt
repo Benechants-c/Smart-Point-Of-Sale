@@ -4,28 +4,28 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.*
 import android.view.Gravity
-import android.content.Intent
 import android.content.SharedPreferences
 
 class LoginActivity : Activity() {
     lateinit var pref: SharedPreferences
-    var total = 0.0
-    var salesText = ""
-    // Product format: CODE|NAME|QTY|PRICE|MIN_PRICE
-    var products = mutableMapOf<String, Product>() // key = CODE
+    var totalSales = 0.0
+    var salesLog = ""
+    var products = mutableMapOf<String, Product>()
+    var cart = mutableListOf<CartItem>()
 
     data class Product(var code: String, var name: String, var qty: Int, var price: Double, var minPrice: Double)
+    data class CartItem(var code: String, var name: String, var qty: Int, var price: Double) { val total get() = qty * price }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pref = getSharedPreferences("pos_big", 0)
+        pref = getSharedPreferences("pos_v4", 0)
         loadAll()
         showLogin()
     }
 
     fun loadAll() {
-        total = pref.getFloat("total", 0f).toDouble()
-        salesText = pref.getString("sales", "")?: ""
+        totalSales = pref.getFloat("total", 0f).toDouble()
+        salesLog = pref.getString("sales", "")?: ""
         val saved = pref.getString("products", "")?: ""
         if (saved.isNotEmpty()) {
             saved.split(";;").forEach {
@@ -37,117 +37,108 @@ class LoginActivity : Activity() {
 
     fun saveAll() {
         val prodStr = products.values.joinToString(";;") { "${it.code}|${it.name}|${it.qty}|${it.price}|${it.minPrice}" }
-        pref.edit().putString("products", prodStr).putString("sales", salesText).putFloat("total", total.toFloat()).apply()
+        pref.edit().putString("products", prodStr).putString("sales", salesLog).putFloat("total", totalSales.toFloat()).apply()
     }
 
     fun showLogin() {
         val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(60,200,60,60); gravity = Gravity.CENTER }
-        val t = TextView(this).apply { text = "SMART POS v3\nBIG SHOPS EDITION\nSHOP001-HRE\n\$12/mo COMMERCIAL"; textSize = 18f; gravity = Gravity.CENTER; setPadding(0,0,0,30) }
+        val t = TextView(this).apply { text = "SMART POS v4\nBIG SHOPS RECEIVING\nSHOP001-HRE"; textSize = 18f; gravity = Gravity.CENTER; setPadding(0,0,0,30) }
         val pin = EditText(this).apply { hint = "PIN 1234"; inputType = 129 }
-        val btn = Button(this).apply { text = "LOGIN ADMIN" }
-        btn.setOnClickListener {
-            if (pin.text.toString() == "1234") { showDashboard() }
-            else Toast.makeText(this, "PIN 1234", Toast.LENGTH_SHORT).show()
-        }
+        val btn = Button(this).apply { text = "LOGIN" }
+        btn.setOnClickListener { if(pin.text.toString()=="1234") showDashboard() else Toast.makeText(this,"PIN 1234",Toast.LENGTH_SHORT).show() }
         lay.addView(t); lay.addView(pin); lay.addView(btn)
         setContentView(lay)
     }
 
     fun showDashboard() {
         val scroll = ScrollView(this)
-        val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(25,50,25,25) }
+        val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,40,20,20) }
 
-        val title = TextView(this).apply { text = "BIG SHOP POS v3\nSHOP001-HRE | AUDIT ON ✅\nProducts: ${products.size} | TOTAL: \$${String.format("%.2f", total)}"; textSize = 15f; gravity = Gravity.CENTER; setPadding(0,0,0,15) }
+        val title = TextView(this).apply { text = "SMART POS v4 \$12/mo\nSHOP001-HRE | AUDIT ON ✅"; textSize = 16f; gravity = Gravity.CENTER; setPadding(0,0,0,15) }
 
-        // --- CREATE PRODUCT ---
-        val lblCreate = TextView(this).apply { text = "--- CREATE PRODUCT ---"; textSize = 16f; setPadding(0,10,0,5) }
-        val eCode = EditText(this).apply { hint = "Product Code (e.g. 001 or BREAD01)" }
-        val eName = EditText(this).apply { hint = "Product Name (e.g. Mazoe Orange 2L)" }
-        val eQty = EditText(this).apply { hint = "Quantity (e.g. 50)"; inputType = 2 }
-        val ePrice = EditText(this).apply { hint = "Selling Price (e.g. 3.50)"; inputType = 8194 }
-        val eMinPrice = EditText(this).apply { hint = "MIN Price (DENY if lower, e.g. 3.00)"; inputType = 8194 }
-        val btnCreate = Button(this).apply { text = "CREATE / UPDATE PRODUCT" }
+        // ===== 1. PRODUCT RECEIVING MENU =====
+        val lblRec = TextView(this).apply { text = "=== PRODUCT RECEIVING MENU ==="; textSize = 16f; setPadding(0,10,0,5) }
+        val eName = EditText(this).apply { hint = "Product name............" }
+        val eCode = EditText(this).apply { hint = "Product code............" }
+        val eSellPrice = EditText(this).apply { hint = "Selling price...."; inputType = 8194 }
+        val eMinPrice = EditText(this).apply { hint = "Min Price (Code)........"; inputType = 8194 }
+        val eQty = EditText(this).apply { hint = "Quantity........"; inputType = 2 }
+        val btnReceive = Button(this).apply { text = "RECEIVE STOCK" }
 
-        // --- SELL ---
-        val lblSell = TextView(this).apply { text = "--- SELL PRODUCT ---"; textSize = 16f; setPadding(0,20,0,5) }
-        val eSellCode = EditText(this).apply { hint = "Enter CODE to sell (e.g. 001)" }
-        val eSellPrice = EditText(this).apply { hint = "Price customer pays"; inputType = 8194 }
-        val btnSell = Button(this).apply { text = "SELL - CHECK MIN PRICE" }
+        val tvStock = TextView(this).apply { text = getStockDisplay(); setPadding(0,10,0,10); textSize = 13f }
 
-        val tvProducts = TextView(this).apply { text = getProductDisplay(); setPadding(0,15,0,10) }
-        val tvLog = TextView(this).apply { text = "Sales:\n$salesText"; setPadding(0,10,0,10) }
-        val tvTotal = TextView(this).apply { text = "TOTAL: \$${String.format("%.2f", total)}"; textSize = 20f; setPadding(0,10,0,10) }
+        // ===== 2. CART RECEIPT =====
+        val lblCart = TextView(this).apply { text = "=== CART RECEIPT ==="; textSize = 16f; setPadding(0,20,0,5) }
+        val eCartCode = EditText(this).apply { hint = "Scan / Enter Product Code" }
+        val eCartQty = EditText(this).apply { hint = "Qty (default 1)"; inputType = 2 }
+        val eCartPrice = EditText(this).apply { hint = "Price (leave blank = default price)"; inputType = 8194 }
+        val btnAddCart = Button(this).apply { text = "ADD TO CART" }
 
-        val btnReceipt = Button(this).apply { text = "SHARE RECEIPT" }
-        val btnClear = Button(this).apply { text = "CLEAR DAY" }
-        val btnLogout = Button(this).apply { text = "LOGOUT" }
+        val tvCart = TextView(this).apply { text = "Cart:\nProduct Qty Price Total\n---------------------------\n(empty)"; setPadding(0,10,0,10); textSize = 13f }
+        val tvTotal = TextView(this).apply { text = "Total.... \$0.00"; textSize = 18f; setPadding(0,10,0,5) }
+        val eTender = EditText(this).apply { hint = "Tender..... (cash given)"; inputType = 8194 }
+        val tvChange = TextView(this).apply { text = "Change.... \$0.00"; textSize = 18f; setPadding(0,5,0,10) }
+        val btnTender = Button(this).apply { text = "CALCULATE CHANGE" }
+        val btnPay = Button(this).apply { text = "PAY & PRINT RECEIPT" }
+        val btnClearCart = Button(this).apply { text = "CLEAR CART" }
 
-        btnCreate.setOnClickListener {
-            if (eCode.text.isEmpty() || eName.text.isEmpty() || eQty.text.isEmpty() || ePrice.text.isEmpty() || eMinPrice.text.isEmpty()) {
-                Toast.makeText(this, "Fill ALL fields", Toast.LENGTH_SHORT).show(); return@setOnClickListener
-            }
+        // Receiving logic
+        btnReceive.setOnClickListener {
+            if(eName.text.isEmpty() || eCode.text.isEmpty() || eSellPrice.text.isEmpty() || eQty.text.isEmpty()){ Toast.makeText(this,"Fill name, code, price, qty",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             try {
                 val code = eCode.text.toString().trim().uppercase()
-                val prod = Product(code, eName.text.toString(), eQty.text.toString().toInt(), ePrice.text.toString().toDouble(), eMinPrice.text.toString().toDouble())
-                if (prod.minPrice > prod.price) { Toast.makeText(this, "MIN Price cannot be > Selling Price!", Toast.LENGTH_LONG).show(); return@setOnClickListener }
-                products[code] = prod
+                val minP = if(eMinPrice.text.isEmpty()) eSellPrice.text.toString().toDouble() else eMinPrice.text.toString().toDouble()
+                val price = eSellPrice.text.toString().toDouble()
+                if(price < minP){ Toast.makeText(this,"❌ Selling price cannot be < MIN price!",Toast.LENGTH_LONG).show(); return@setOnClickListener }
+                val qty = eQty.text.toString().toInt()
+                val existing = products[code]
+                if(existing!= null){
+                    existing.qty += qty
+                    existing.name = eName.text.toString()
+                    existing.price = price
+                    existing.minPrice = minP
+                } else {
+                    products[code] = Product(code, eName.text.toString(), qty, price, minP)
+                }
                 saveAll()
-                tvProducts.text = getProductDisplay()
-                title.text = "BIG SHOP POS v3\nSHOP001-HRE | AUDIT ON ✅\nProducts: ${products.size} | TOTAL: \$${String.format("%.2f", total)}"
-                Toast.makeText(this, "Product $code Saved ✅", Toast.LENGTH_SHORT).show()
-                eCode.text.clear(); eName.text.clear(); eQty.text.clear(); ePrice.text.clear(); eMinPrice.text.clear()
-            } catch (e: Exception) { Toast.makeText(this, "Check numbers", Toast.LENGTH_SHORT).show() }
+                tvStock.text = getStockDisplay()
+                Toast.makeText(this,"Received $qty x ${eName.text} ✅",Toast.LENGTH_SHORT).show()
+                eName.text.clear(); eCode.text.clear(); eSellPrice.text.clear(); eMinPrice.text.clear(); eQty.text.clear()
+            } catch(e: Exception){ Toast.makeText(this,"Check numbers",Toast.LENGTH_SHORT).show() }
         }
 
-        btnSell.setOnClickListener {
-            val code = eSellCode.text.toString().trim().uppercase()
-            if (code.isEmpty() || eSellPrice.text.isEmpty()) { Toast.makeText(this, "Enter Code & Price", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+        // Cart logic
+        fun refreshCart(){
+            if(cart.isEmpty()){
+                tvCart.text = "Cart:\nProduct Qty Price Total\n---------------------------\n(empty)"
+                tvTotal.text = "Total.... \$0.00"
+                return
+            }
+            var txt = "Cart:\nProduct Qty Price Total\n---------------------------\n"
+            var sum = 0.0
+            cart.forEach {
+                txt += "${it.name.take(12)} ${it.qty} \$${it.price} \$${String.format("%.2f",it.total)}\n"
+                sum += it.total
+            }
+            tvCart.text = txt
+            tvTotal.text = "Total.... \$${String.format("%.2f",sum)}"
+        }
+
+        btnAddCart.setOnClickListener {
+            val code = eCartCode.text.toString().trim().uppercase()
+            if(code.isEmpty()){ Toast.makeText(this,"Enter Product Code",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             val prod = products[code]
-            if (prod == null) { Toast.makeText(this, "Product CODE not found!", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
-            if (prod.qty <= 0) { Toast.makeText(this, "${prod.name} OUT OF STOCK!", Toast.LENGTH_LONG).show(); return@setOnClickListener }
-            try {
-                val payPrice = eSellPrice.text.toString().toDouble()
-                // *** MIN PRICE CHECK - DENY SALE ***
-                if (payPrice < prod.minPrice) {
-                    Toast.makeText(this, "❌ DENIED! Price \$${payPrice} < MIN \$${prod.minPrice} for ${prod.name}", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                if (payPrice < prod.price) {
-                    Toast.makeText(this, "⚠️ Warning: Selling below Price but above MIN", Toast.LENGTH_SHORT).show()
-                }
-                // Sell OK
-                prod.qty -= 1
-                total += payPrice
-                salesText += "${prod.code} ${prod.name} - \$${payPrice} (Stock ${prod.qty})\n"
-                saveAll()
-                tvProducts.text = getProductDisplay()
-                tvLog.text = "Sales:\n$salesText"
-                tvTotal.text = "TOTAL: \$${String.format("%.2f", total)}"
-                title.text = "BIG SHOP POS v3\nSHOP001-HRE | AUDIT ON ✅\nProducts: ${products.size} | TOTAL: \$${String.format("%.2f", total)}"
-                Toast.makeText(this, "Sold ${prod.name} ✅ Stock ${prod.qty}", Toast.LENGTH_SHORT).show()
-                eSellCode.text.clear(); eSellPrice.text.clear()
-            } catch (e: Exception) { Toast.makeText(this, "Invalid price", Toast.LENGTH_SHORT).show() }
+            if(prod==null){ Toast.makeText(this,"Code $code not found! Receive first",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+            val qty = if(eCartQty.text.isEmpty()) 1 else eCartQty.text.toString().toIntOrNull()?:1
+            if(qty > prod.qty){ Toast.makeText(this,"Not enough stock! Only ${prod.qty} left",Toast.LENGTH_LONG).show(); return@setOnClickListener }
+            val sellPrice = if(eCartPrice.text.isEmpty()) prod.price else eCartPrice.text.toString().toDoubleOrNull()?:prod.price
+            if(sellPrice < prod.minPrice){ Toast.makeText(this,"❌ DENIED! \$${sellPrice} < MIN \$${prod.minPrice} for ${prod.name}",Toast.LENGTH_LONG).show(); return@setOnClickListener }
+            // Add to cart
+            cart.add(CartItem(code, prod.name, qty, sellPrice))
+            refreshCart()
+            eCartCode.text.clear(); eCartQty.text.clear(); eCartPrice.text.clear()
         }
 
-        btnReceipt.setOnClickListener {
-            val receipt = "SMART POS v3 BIG SHOPS \$12/mo\nSHOP001-HRE AUDIT ON\n\n$salesText\nTOTAL: \$${String.format("%.2f", total)}\nProducts:\n${getProductDisplay()}"
-            val i = Intent().apply { action = Intent.ACTION_SEND; putExtra(Intent.EXTRA_TEXT, receipt); type = "text/plain" }
-            startActivity(Intent.createChooser(i, "Receipt"))
-        }
-
-        btnClear.setOnClickListener { salesText = ""; total = 0.0; saveAll(); tvLog.text = "Sales:\n"; tvTotal.text = "TOTAL: \$0.00"; title.text = "BIG SHOP POS v3\nSHOP001-HRE | AUDIT ON ✅\nProducts: ${products.size} | TOTAL: \$0.00"; Toast.makeText(this, "Day cleared", Toast.LENGTH_SHORT).show() }
-        btnLogout.setOnClickListener { showLogin() }
-
-        lay.addView(title)
-        lay.addView(lblCreate); lay.addView(eCode); lay.addView(eName); lay.addView(eQty); lay.addView(ePrice); lay.addView(eMinPrice); lay.addView(btnCreate)
-        lay.addView(lblSell); lay.addView(eSellCode); lay.addView(eSellPrice); lay.addView(btnSell)
-        lay.addView(tvTotal); lay.addView(tvProducts); lay.addView(tvLog); lay.addView(btnReceipt); lay.addView(btnClear); lay.addView(btnLogout)
-        scroll.addView(lay)
-        setContentView(scroll)
-    }
-
-    fun getProductDisplay(): String {
-        if (products.isEmpty()) return "No Products yet - Create above"
-        return "STOCK (Code | Name | Qty | Price | MIN):\n" + products.values.joinToString("\n") { "${it.code} | ${it.name} | Qty:${it.qty} | \$${it.price} | MIN:\$${it.minPrice}" }
-    }
-}
+        btnTender.setOnClickListener {
+            val sum = cart.sumOf { it.total }
+            val tender = eTender.text.toString().toDoubleOrNull()?:0.
