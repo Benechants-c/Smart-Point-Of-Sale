@@ -1,9 +1,38 @@
-<activity android:name=".AdminActivity" />
-<activity android:name=".AdminDetailActivity" />
-<activity android:name=".ReceiveStockActivity" />
-<activity android:name=".LoginActivity">
-    <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-    </intent-filter>
-</activity>
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.smartpos">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="SMART POS"
+        android:theme="@android:style/Theme.NoTitleBar">
+
+        <!-- LOGIN IS FIRST -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ADMIN DASHBOARD - YOUR NEW DRAWING -->
+        <activity
+            android:name=".AdminActivity"
+            android:exported="false" />
+
+        <!-- ALL DRAWERS OPEN HERE -->
+        <activity
+            android:name=".AdminDetailActivity"
+            android:exported="false" />
+
+        <!-- RECEIVING - SUPPLIER OPTIONAL -->
+        <activity
+            android:name=".ReceiveStockActivity"
+            android:exported="false" />
+
+    </application>
+
+</manifest>
