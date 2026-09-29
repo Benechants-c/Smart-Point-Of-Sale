@@ -120,7 +120,15 @@ class LoginActivity : Activity() {
             bEco.setBackgroundColor(Color.parseColor("#7C3AED")); bEco.setTextColor(Color.WHITE)
             payRow.addView(bCash, LinearLayout.LayoutParams(0, -2, 1f))
             payRow.addView(bEco, LinearLayout.LayoutParams(0, -2, 1f))
-
+          
+            val recvBtn = Button(this)
+            recvBtn.text = "📦 RECEIVE STOCK"
+            recvBtn.setBackgroundColor(Color.parseColor("#10B981"))
+            recvBtn.setTextColor(Color.WHITE)
+            payRow.addView(recvBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            recvBtn.setOnClickListener {
+            startActivity(Intent(this, ReceiveStockActivity::class.java))
+}
             val eRec = EditText(this)
             eRec.hint = "Amount Received"
             eRec.inputType = 8194
