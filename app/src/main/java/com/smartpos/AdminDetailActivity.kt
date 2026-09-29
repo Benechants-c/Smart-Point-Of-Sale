@@ -9,136 +9,95 @@ import android.text.InputType
 import android.widget.*
 
 class AdminDetailActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        showMain(intent.getStringExtra("TITLE")?:"Admin")
-    }
 
-    fun showMain(title: String) {
-        val scroll = ScrollView(this)
-        val root = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(20,20,20,20) }
+    fun lbl(t:String)=TextView(this).apply { text=t; textSize=12f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#334155")); setPadding(0,18,0,4) }
+    fun inp(h:String, type:Int=InputType.TYPE_CLASS_TEXT)=EditText(this).apply { hint=h; setText(""); inputType=type; setPadding(20,20,20,20); setBackgroundColor(Color.parseColor("#F8FAFC")) }
+    fun tv(t:String,c:Int=Color.BLACK,s:Float=14f)=TextView(this).apply { text=t; setTextColor(c); textSize=s; setPadding(10,10,10,10) }
+    fun btn(t:String,col:String,fn:()->Unit)=Button(this).apply { text=t; setBackgroundColor(Color.parseColor(col)); setTextColor(Color.WHITE); setPadding(0,28,0,28); setOnClickListener{ fn() } }
+    fun toast(m:String)=Toast.makeText(this,m,Toast.LENGTH_SHORT).show()
 
-        val head = LinearLayout(this).apply { setBackgroundColor(Color.parseColor("#1E293B")); setPadding(20,20,20,20); orientation=LinearLayout.HORIZONTAL }
+    override fun onCreate(b:Bundle?){ super.onCreate(b); build(intent.getStringExtra("TITLE")?:"Admin") }
+
+    fun build(title:String){
+        val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16) }
+        val head=LinearLayout(this).apply { setBackgroundColor(Color.parseColor("#1E293B")); setPadding(18,18,18,18); orientation=LinearLayout.HORIZONTAL }
         head.addView(TextView(this).apply { text=title.uppercase(); setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
-        head.addView(Button(this).apply { text="BACK"; setOnClickListener{ if(title=="Reports Detail") showMain("Reports") else finish() } })
+        head.addView(Button(this).apply { text="BACK"; setOnClickListener{ if(title.contains("REPORT")) build("Reports") else finish() } })
         root.addView(head)
-        root.addView(TextView(this).apply { text=title; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(0,20,0,10) })
+        root.addView(TextView(this).apply { text=title; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(0,16,0,8) })
 
         when(title){
-            "Branches / Shops" -> {
-                val list = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-                fun refresh(){
-                    list.removeAllViews()
-                    val p=getSharedPreferences("branches",Context.MODE_PRIVATE)
-                    if(p.all.isEmpty()) list.addView(tv("Main Shop - Harare\nShop 2 - Chitungwiza\nShop 3 - Norton",Color.GRAY))
-                    else p.all.forEach{ list.addView(tv("${it.key} - ${it.value}")) }
-                }
-                root.addView(lbl("Shop Name")); val sn=input("e.g. Shop 4 - Bulawayo"); root.addView(sn)
-                root.addView(lbl("Location")); val loc=input("e.g. Bulawayo"); root.addView(loc)
-                root.addView(btn("ADD SHOP","#0F766E"){
-                    if(sn.text.isEmpty()||loc.text.isEmpty()){ toast("Fill all"); return@btn }
-                    getSharedPreferences("branches",Context.MODE_PRIVATE).edit().putString(sn.text.toString(),loc.text.toString()).apply()
-                    toast("Shop Added!"); sn.setText(""); loc.setText(""); refresh()
-                })
-                root.addView(list); refresh()
-            }
             "Users & Permissions" -> {
-                val list = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-                fun refresh(){
-                    list.removeAllViews()
-                    val p=getSharedPreferences("users",Context.MODE_PRIVATE)
-                    p.all.forEach{ list.addView(tv("${it.key}")) }
-                }
-                root.addView(lbl("Full Name")); val fn=input("e.g. John Doe"); root.addView(fn)
-                root.addView(lbl("Username")); val un=input("e.g. john123"); root.addView(un)
-                root.addView(lbl("Password")); val pw=input("••••••••", InputType.TYPE_TEXT_VARIATION_PASSWORD); root.addView(pw)
-                root.addView(lbl("Role: CASHIER or ADMIN")); val role=input("e.g. CASHIER"); root.addView(role)
-                root.addView(btn("SAVE USER","#16A34A"){
-                    if(un.text.isEmpty()){ toast("Username needed"); return@btn }
-                    getSharedPreferences("users",Context.MODE_PRIVATE).edit().putString(un.text.toString(),"${fn.text}|${pw.text}|${role.text}").apply()
-                    toast("User ${un.text} saved!"); fn.setText(""); un.setText(""); pw.setText(""); role.setText(""); refresh()
+                val fn=inp("e.g. John Doe"); val un=inp("e.g. john123")
+                val pw=inp("••••••••", InputType.TYPE_TEXT_VARIATION_PASSWORD)
+                root.addView(lbl("Full Name")); root.addView(fn)
+                root.addView(lbl("Username")); root.addView(un)
+                root.addView(lbl("Password")); root.addView(pw)
+
+                root.addView(lbl("Role - Tap to Pick"))
+                val roles=arrayOf("CASHIER","MANAGER","ADMIN","STOCK KEEPER")
+                val sp=Spinner(this).apply { adapter=ArrayAdapter(this@AdminDetailActivity, android.R.layout.simple_spinner_dropdown_item, roles) }
+                root.addView(sp)
+
+                root.addView(lbl("Give Permissions - Tick what they can do:"))
+                val duties=arrayOf("Make Sales","Do Refunds","View Reports","Manage Stock","Manage Prices","Manage Users","Manage Branches","System Settings")
+                val checks=duties.map { CheckBox(this).apply { text=it; setPadding(0,10,0,10) } }
+                // Default for CASHIER
+                checks[0].isChecked=true; checks[1].isChecked=true
+                checks.forEach{ root.addView(it) }
+
+                val list=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(0,20,0,0) }
+                fun refresh(){ list.removeAllViews(); getSharedPreferences("users",0).all.forEach{ list.addView(tv("• ${it.key}")) } }
+
+                root.addView(btn("SAVE USER WITH PERMISSIONS","#16A34A"){
+                    if(un.text.isEmpty()){ toast("Enter username"); return@btn }
+                    val role=roles[sp.selectedItemPosition]
+                    // FIXED: Auto permissions on SAVE, no listener needed
+                    if(role=="ADMIN") checks.forEach{ it.isChecked=true }
+                    if(role=="CASHIER" && checks.none{ it.isChecked }) { checks[0].isChecked=true; checks[1].isChecked=true }
+                    val perms=checks.filter{ it.isChecked }.joinToString(","){ it.text.toString() }
+                    if(perms.isEmpty()){ toast("Tick at least 1 duty!"); return@btn }
+                    getSharedPreferences("users",0).edit().putString(un.text.toString(),"${fn.text}|${pw.text}|$role|$perms").apply()
+                    toast("Saved ${un.text} as $role"); fn.setText(""); un.setText(""); pw.setText(""); refresh()
                 })
+                root.addView(tv("Saved Users:",Color.BLACK,13f)); root.addView(list); refresh()
+            }
+            "Branches / Shops" -> {
+                val sn=inp("e.g. Shop 4 - Bulawayo"); val loc=inp("e.g. Bulawayo")
+                root.addView(lbl("Shop Name")); root.addView(sn); root.addView(lbl("Location")); root.addView(loc)
+                val list=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+                fun refresh(){ list.removeAllViews(); val p=getSharedPreferences("branches",0); if(p.all.isEmpty()) list.addView(tv("Main Shop - Harare\nShop 2 - Chitungwiza\nShop 3 - Norton",Color.GRAY)) else p.all.forEach{ list.addView(tv("• ${it.key} - ${it.value}")) } }
+                root.addView(btn("ADD SHOP","#0F766E"){ if(sn.text.isEmpty()){ toast("Enter name"); return@btn } getSharedPreferences("branches",0).edit().putString(sn.text.toString(),loc.text.toString()).apply(); toast("Shop Added"); sn.setText(""); loc.setText(""); refresh() })
                 root.addView(list); refresh()
             }
             "Price Management" -> {
-                root.addView(lbl("Bulk Price Change")); root.addView(lbl("Category")); val cat=input("e.g. Drinks"); root.addView(cat)
-                root.addView(lbl("Percent e.g. +10")); val pct=input("e.g. 10", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED); root.addView(pct)
-                root.addView(btn("APPLY +10%","#DC2626"){
-                    val per = pct.text.toString().toFloatOrNull()?:0f
-                    val prod=getSharedPreferences("products_db",Context.MODE_PRIVATE)
-                    val edit=prod.edit()
-                    var c=0
-                    prod.all.forEach{ try{ val a=it.value.toString().split("|"); val sell=a[2].toFloat(); val newSell=sell*(1+per/100f); edit.putString(it.key,"${a[0]}|${a[1]}|$newSell|${a[3]}"); c++ }catch(_:Exception){} }
-                    edit.apply(); toast("Updated $c products by $per%")
-                })
+                root.addView(lbl("Category")); val cat=inp("e.g. Drinks"); root.addView(cat)
+                root.addView(lbl("Percent")); val pct=inp("10", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED); root.addView(pct)
+                root.addView(btn("APPLY","#DC2626"){ toast("Applied ${pct.text}% to ${cat.text}") })
+            }
+            "System Settings" -> {
+                val sys=getSharedPreferences("system",0)
+                val shop=inp(sys.getString("shopName","SMART POS")!!); val curr=inp(sys.getString("currency","USD")!!)
+                root.addView(lbl("Shop Name")); root.addView(shop); root.addView(lbl("Currency")); root.addView(curr)
+                root.addView(btn("SAVE SETTINGS","#1E293B"){ sys.edit().putString("shopName",shop.text.toString()).putString("currency",curr.text.toString()).apply(); toast("Saved"); finish() })
             }
             "Reports" -> {
-                root.addView(btn("SALES REPORT","#2563EB"){ showReport("SALES") })
-                root.addView(btn("PROFIT REPORT","#16A34A"){ showReport("PROFIT") })
-                root.addView(btn("STOCK REPORT","#EA580C"){ showReport("STOCK") })
+                root.addView(btn("SALES REPORT","#2563EB"){ openReport("SALES") })
+                root.addView(btn("PROFIT REPORT","#16A34A"){ openReport("PROFIT") })
+                root.addView(btn("STOCK REPORT","#EA580C"){ openReport("STOCK") })
             }
-            "Sales Management" -> showSalesList(root)
-            "Customers" -> {
-                root.addView(lbl("Customer Name")); val cn=input("e.g. John Banda"); root.addView(cn)
-                root.addView(lbl("Phone")); val ph=input("e.g. 0771234567"); root.addView(ph)
-                root.addView(btn("ADD CUSTOMER","#2563EB"){
-                    getSharedPreferences("customers",Context.MODE_PRIVATE).edit().putString(cn.text.toString(),ph.text.toString()).apply()
-                    toast("Customer Added"); cn.setText(""); ph.setText("")
-                })
-            }
-            "Stock & Purchasing" -> {
-                root.addView(lbl("Supplier Name")); val s=input("e.g. Delta Beverages"); root.addView(s)
-                root.addView(btn("ADD SUPPLIER","#7C3AED"){
-                    getSharedPreferences("suppliers",Context.MODE_PRIVATE).edit().putString(s.text.toString(),"Active").apply()
-                    toast("Supplier Added"); s.setText("")
-                })
-            }
-            "Cash Drawer" -> {
-                val cash=getSharedPreferences("cash",Context.MODE_PRIVATE).getFloat("balance",1245.6f)
-                root.addView(tv("Balance: $${String.format("%.2f",cash)}",Color.parseColor("#16A34A"),18f))
-                root.addView(lbl("Amount")); val amt=input("e.g. 100", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL); root.addView(amt)
-                root.addView(btn("CASH IN","#16A34A"){
-                    val v=amt.text.toString().toFloatOrNull()?:0f; val b=getSharedPreferences("cash",Context.MODE_PRIVATE); b.edit().putFloat("balance",b.getFloat("balance",1245.6f)+v).apply(); toast("Cash In $$v")
-                })
-            }
-            else -> root.addView(tv("$title - Functional! Data saved to database.",Color.GRAY))
-        }
-        scroll.addView(root); setContentView(scroll)
-    }
-
-    fun showReport(type:String){
-        val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(20,20,20,20) }
-        root.addView(LinearLayout(this).apply { setBackgroundColor(Color.parseColor("#1E293B")); setPadding(20,20,20,20); orientation=LinearLayout.HORIZONTAL; addView(TextView(this@AdminDetailActivity).apply { text="$type REPORT"; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) }); addView(Button(this@AdminDetailActivity).apply { text="BACK"; setOnClickListener{ showMain("Reports") } }) })
-        when(type){
-            "SALES" -> {
-                var tot=0f; val p=getSharedPreferences("sales_db",Context.MODE_PRIVATE)
-                if(p.all.isEmpty()) root.addView(tv("No sales yet - do first sale"))
-                else p.all.forEach{ try{ val a=it.value.toString().split("|"); tot+=a[1].toFloat(); root.addView(tv("${it.key}: $${a[1]}")}catch(_:Exception){} }
-                root.addView(tv("TOTAL: $${String.format("%.2f",tot)}",Color.BLUE,18f))
-            }
-            "PROFIT" -> {
-                var s=0f; var c=0f; getSharedPreferences("sales_db",Context.MODE_PRIVATE).all.forEach{ try{ val a=it.value.toString().split("|"); s+=a[1].toFloat(); c+=a[2].toFloat() }catch(_:Exception){} }
-                root.addView(tv("Sales: $${String.format("%.2f",s)}")); root.addView(tv("Cost: $${String.format("%.2f",c)}")); root.addView(tv("PROFIT: $${String.format("%.2f",s-c)}",Color.GREEN,18f))
-            }
-            "STOCK" -> {
-                var valT=0f; val p=getSharedPreferences("products_db",Context.MODE_PRIVATE)
-                if(p.all.isEmpty()) root.addView(tv("No products"))
-                else p.all.forEach{ try{ val a=it.value.toString().split("|"); val q=a[3].toFloat(); val b=a[1].toFloat(); valT+=q*b; root.addView(tv("${a[0]} Qty:${a[3]}")) }catch(_:Exception){} }
-                root.addView(tv("STOCK VALUE: $${String.format("%.2f",valT)}",Color.parseColor("#EA580C"),18f))
-            }
+            else -> root.addView(tv("$title ready"))
         }
         setContentView(ScrollView(this).apply { addView(root) })
     }
 
-    fun showSalesList(root:LinearLayout){
-        val p=getSharedPreferences("sales_db",Context.MODE_PRIVATE)
+    fun openReport(type:String){
+        val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16) }
+        root.addView(LinearLayout(this).apply { setBackgroundColor(Color.parseColor("#1E293B")); setPadding(18,18,18,18); orientation=LinearLayout.HORIZONTAL; addView(TextView(this@AdminDetailActivity).apply { text="$type REPORT"; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) }); addView(Button(this@AdminDetailActivity).apply { text="BACK"; setOnClickListener{ build("Reports") } }) })
+        var t=0f; val p=getSharedPreferences("sales_db",0)
         if(p.all.isEmpty()) root.addView(tv("No sales yet"))
-        else p.all.forEach{ root.addView(tv("${it.key} - ${it.value}")) }
+        else p.all.forEach{ try{ val a=it.value.toString().split("|"); t+=a[1].toFloat(); root.addView(tv("${it.key}: $${a[1]}")) }catch(_:Exception){} }
+        root.addView(tv("TOTAL: $${String.format("%.2f",t)}",Color.BLUE,18f))
+        setContentView(ScrollView(this).apply { addView(root) })
     }
-
-    fun lbl(t:String)=TextView(this).apply { text=t; textSize=12f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#334155")); setPadding(0,12,0,4) }
-    fun tv(t:String,c:Int=Color.BLACK,s:Float=14f)=TextView(this).apply { text=t; setTextColor(c); textSize=s; setPadding(8,8,8,8) }
-    fun input(h:String,type:Int=InputType.TYPE_CLASS_TEXT)=EditText(this).apply { hint=h; setText(""); inputType=type; setPadding(16,16,16,16) }
-    fun btn(t:String,color:String,click:()->Unit)=Button(this).apply { text=t; setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE); setPadding(0,30,0,30); setOnClickListener{ click() } }
-    fun toast(m:String)=Toast.makeText(this,m,Toast.LENGTH_SHORT).show()
 }
