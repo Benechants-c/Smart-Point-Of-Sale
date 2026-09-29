@@ -26,7 +26,7 @@ class AdminActivity : Activity() {
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
             val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
-            headerText.addView(TextView(this).apply { text = "🏪 ShopMart"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
+            headerText.addView(TextView(this).apply { text = "🏪 Smartpos"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
             headerText.addView(TextView(this).apply { text = "Admin Dashboard • Main Shop"; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")) })
             val avatar = TextView(this).apply { text = "👤"; textSize = 28f; setBackgroundColor(Color.parseColor("#334155")); setPadding(16,8,16,8) }
             header.addView(headerText); header.addView(avatar)
