@@ -1,280 +1,253 @@
-package com.smartpos
+package com.smartshop.posv5
 
-import android.app.Activity
 import android.os.Bundle
-import android.widget.*
-import android.view.Gravity
-import android.view.View
-import android.graphics.Color
-import android.content.SharedPreferences
-import android.text.Editable
-import android.text.TextWatcher
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
 import java.util.*
 
-class LoginActivity : Activity() {
-    lateinit var pref: SharedPreferences
-    var stock = HashMap<String, Item>()
-    var cart = ArrayList<Item>()
-    data class Item(var name: String, var code: String, var cost: Double, var sell: Double, var qty: Int)
+data class CartItem(val code: String, val name: String, val price: Double, var qty: Int)
+data class ReceivingRecord(val date: String, val code: String, val name: String, val qty: Int, val cost: Double, val price: Double, val supplier: String)
 
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pref = getSharedPreferences("pos", 0)
-        stock["1002"] = Item("milk","1002",0.7,1.0,50)
-        stock["1003"] = Item("dovi","1003",2.0,3.0,20)
-        stock["CC500"] = Item("Coca Cola","CC500",0.7,1.0,50)
-        stock["BRD001"] = Item("Bread","BRD001",1.2,1.5,20)
-        login()
+        setContent { PosApp() }
     }
+}
 
-    fun login(){
-        val lay = LinearLayout(this)
-        lay.orientation = LinearLayout.VERTICAL
-        lay.setPadding(60,200,60,60)
-        lay.gravity = Gravity.CENTER
-        lay.setBackgroundColor(Color.parseColor("#0A1931"))
-        val t = TextView(this)
-        t.text = "SmartShop POS\n0000 Cashier / 1234 Admin"
-        t.gravity = Gravity.CENTER
-        t.setTextColor(Color.WHITE)
-        t.textSize = 18f
-        val pin = EditText(this)
-        pin.hint = "Enter PIN"
-        pin.setBackgroundColor(Color.WHITE)
-        val btn = Button(this)
-        btn.text = "LOGIN"
-        btn.setBackgroundColor(Color.parseColor("#185ADB"))
-        btn.setTextColor(Color.WHITE)
-        btn.setOnClickListener{
-            val v = pin.text.toString()
-            if(v=="0000"){ dashboard(false) }
-            else if(v=="1234"){ dashboard(true) }
+@Composable
+fun PosApp() {
+    var isLoggedIn by remember { mutableStateOf(false) }
+    var role by remember { mutableStateOf("cashier") }
+    var pin by remember { mutableStateOf("") }
+    var screen by remember { mutableStateOf("login") } // login, sales, admin_home, receiving, sales_report
+
+    // STOCK - shop product code is KEY
+    var stockMap by remember { mutableStateOf(mutableMapOf(
+        "1002" to Triple("Milk 500ml", 0.8 to 1.0, 50),
+        "1005" to Triple("Bread", 0.5 to 0.8, 30),
+        "1010" to Triple("Sugar 1kg", 1.2 to 1.5, 20),
+        "1020" to Triple("Coke 330ml", 0.4 to 0.6, 100)
+    ))}
+    var cart by remember { mutableStateOf(mutableListOf<CartItem>()) }
+    var receivingHistory by remember { mutableStateOf(mutableListOf<ReceivingRecord>()) }
+
+    if (!isLoggedIn) {
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+            Text("SmartShop POS", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(value = pin, onValueChange = { pin = it }, label = { Text("PIN 0000 Cashier / 1234 Admin") })
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = {
+                if (pin == "0000") { role = "cashier"; isLoggedIn = true; screen = "sales" }
+                else if (pin == "1234") { role = "admin"; isLoggedIn = true; screen = "admin_home" }
+            }, Modifier.fillMaxWidth()) { Text("LOGIN") }
         }
-        lay.addView(t); lay.addView(pin); lay.addView(btn)
-        setContentView(lay)
+    } else {
+        when (screen) {
+            "sales" -> SalesScreen(stockMap, cart, onCartChange = { cart = it }, onLogout = { isLoggedIn = false; pin = "" }, role = role, onAdminBack = { screen = "admin_home" })
+            "admin_home" -> AdminHomeScreen(onNavigate = { screen = it }, onLogout = { isLoggedIn = false; pin = "" })
+            "receiving" -> ReceivingScreen(stockMap = stockMap, onStockUpdate = { stockMap = it }, history = receivingHistory, onHistoryUpdate = { receivingHistory = it }, onBack = { screen = "admin_home" })
+            else -> AdminHomeScreen(onNavigate = { screen = it }, onLogout = { isLoggedIn = false; pin = "" })
+        }
     }
+}
 
-    fun dashboard(isAdmin: Boolean){
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.HORIZONTAL
-
-        val drawer = LinearLayout(this)
-        drawer.orientation = LinearLayout.VERTICAL
-        drawer.setBackgroundColor(Color.parseColor("#0A1931"))
-        drawer.layoutParams = LinearLayout.LayoutParams(200, LinearLayout.LayoutParams.MATCH_PARENT)
-
-        val scroll = ScrollView(this)
-        scroll.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-        scroll.setBackgroundColor(Color.parseColor("#F1F5F9"))
-
-        val content = LinearLayout(this)
-        content.orientation = LinearLayout.VERTICAL
-        content.setPadding(6,6,6,6)
-
-        fun showHome(){
-            drawer.visibility = View.VISIBLE
-            content.removeAllViews()
-            val tv = TextView(this)
-            tv.text = "ADMIN HOME\n\nSales: "+cart.size+"\n\nGo to SALES"
-            tv.setBackgroundColor(Color.WHITE)
-            tv.setPadding(15,15,15,15)
-            content.addView(tv)
+@Composable
+fun AdminHomeScreen(onNavigate: (String) -> Unit, onLogout: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("ADMIN HOME", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("LOGOUT") }
         }
+        Spacer(Modifier.height(20.dp))
+        Button(onClick = { onNavigate("sales") }, Modifier.fillMaxWidth().height(60.dp)) { Text("SALES (POS)", fontSize = 18.sp) }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = { onNavigate("receiving") }, Modifier.fillMaxWidth().height(60.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("RECEIVING", fontSize = 18.sp) }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = {}, Modifier.fillMaxWidth().height(60.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("STOCK (Coming Next)") }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = {}, Modifier.fillMaxWidth().height(60.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("REPORTS (Coming Next)") }
+    }
+}
 
-        fun showSales(){
-            if(!isAdmin){ drawer.visibility = View.GONE } else { drawer.visibility = View.GONE }
-            content.removeAllViews()
+@Composable
+fun SalesScreen(stockMap: MutableMap<String, Triple<String, Pair<Double, Double>, Int>>, cart: MutableList<CartItem>, onCartChange: (MutableList<CartItem>) -> Unit, onLogout: () -> Unit, role: String, onAdminBack: () -> Unit) {
+    var search by remember { mutableStateOf("") }
+    var receivedText by remember { mutableStateOf("") }
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    var message by remember { mutableStateOf("") }
 
-            val title = TextView(this)
-            title.text = "SMART POS \$12/mo - SALES"
-            title.textSize = 14f
-            content.addView(title)
+    val filtered = stockMap.filter { it.key.contains(search, true) || it.value.first.contains(search, true) }.toList()
+    val total = cart.sumOf { it.price * it.qty }
+    val received = receivedText.toDoubleOrNull()?: 0.0
+    val change = received - total
 
-            val eSearch = EditText(this)
-            eSearch.hint = "Enter code or name"
-            eSearch.setBackgroundColor(Color.WHITE)
-
-            val btnSearch = Button(this)
-            btnSearch.text = "SEARCH ADD"
-            btnSearch.setBackgroundColor(Color.parseColor("#185ADB"))
-            btnSearch.setTextColor(Color.WHITE)
-
-            val cartBox = LinearLayout(this)
-            cartBox.orientation = LinearLayout.VERTICAL
-            cartBox.setBackgroundColor(Color.WHITE)
-
-            val tvTot = TextView(this)
-            tvTot.text = "Total 0.00"
-            tvTot.textSize = 20f
-            tvTot.gravity = Gravity.RIGHT
-            tvTot.setBackgroundColor(Color.parseColor("#1E3A5F"))
-            tvTot.setTextColor(Color.WHITE)
-            tvTot.setPadding(10,10,10,10)
-
-            val payRow = LinearLayout(this)
-            payRow.orientation = LinearLayout.HORIZONTAL
-            val bCash = Button(this); bCash.text = "CASH"
-            bCash.setBackgroundColor(Color.parseColor("#16A34A")); bCash.setTextColor(Color.WHITE)
-            val bEco = Button(this); bEco.text = "ECOCASH"
-            bEco.setBackgroundColor(Color.parseColor("#7C3AED")); bEco.setTextColor(Color.WHITE)
-            payRow.addView(bCash, LinearLayout.LayoutParams(0, -2, 1f))
-            payRow.addView(bEco, LinearLayout.LayoutParams(0, -2, 1f))
-
-            val eRec = EditText(this)
-            eRec.hint = "Amount Received"
-            eRec.inputType = 8194
-            eRec.setBackgroundColor(Color.WHITE)
-
-            val tvChange = TextView(this)
-            tvChange.text = "Change: 0.00"
-            tvChange.textSize = 22f
-            tvChange.gravity = Gravity.RIGHT
-            tvChange.setBackgroundColor(Color.parseColor("#DCFCE7"))
-            tvChange.setPadding(10,10,10,10)
-
-            val bComplete = Button(this)
-            bComplete.text = "COMPLETE SALE"
-            bComplete.setBackgroundColor(Color.parseColor("#16A34A"))
-            bComplete.setTextColor(Color.WHITE)
-
-            val btnBack = Button(this)
-            btnBack.text = "BACK TO ADMIN"
-            btnBack.setOnClickListener{ showHome() }
-
-            fun getTotal(): Double {
-                var s = 0.0
-                for(it in cart){ s = s + it.sell * it.qty }
-                return s
+    Column(Modifier.fillMaxSize().padding(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(if(role=="admin") "SALES - ADMIN" else "SALES - Cashier", fontWeight = FontWeight.Bold)
+            Row {
+                if(role=="admin") { Button(onClick = onAdminBack, modifier = Modifier.padding(end=6.dp)) { Text("BACK TO ADMIN") } }
+                Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
             }
-
-            fun refresh(){
-                cartBox.removeAllViews()
-                var sub = 0.0
-                var idx = 1
-                for(item in cart){
-                    val tot = item.sell * item.qty
-                    sub = sub + tot
-                    val row = LinearLayout(this)
-                    row.orientation = LinearLayout.HORIZONTAL
-                    row.setPadding(2,8,2,8)
-
-                    val tv1 = TextView(this); tv1.text = idx.toString()
-                    tv1.layoutParams = LinearLayout.LayoutParams(0, -2, 0.3f)
-
-                    val tv2 = TextView(this); tv2.text = item.name
-                    tv2.layoutParams = LinearLayout.LayoutParams(0, -2, 1.8f)
-
-                    // FIXED QTY BOX - 3 buttons same line with fixed width
-                    val box = LinearLayout(this)
-                    box.orientation = LinearLayout.HORIZONTAL
-                    box.layoutParams = LinearLayout.LayoutParams(0, -2, 1.5f)
-
-                    val bm = Button(this); bm.text = "-"
-                    bm.layoutParams = LinearLayout.LayoutParams(60, -2)
-                    val tq = TextView(this); tq.text = item.qty.toString(); tq.gravity = Gravity.CENTER
-                    tq.setBackgroundColor(Color.parseColor("#E2E8F0"))
-                    tq.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                    val bp = Button(this); bp.text = "+"
-                    bp.layoutParams = LinearLayout.LayoutParams(60, -2)
-
-                    box.addView(bm); box.addView(tq); box.addView(bp)
-
-                    val tv5 = TextView(this); tv5.text = String.format("%.2f", tot); tv5.gravity = Gravity.CENTER
-                    tv5.layoutParams = LinearLayout.LayoutParams(0, -2, 0.6f)
-
-                    val del = Button(this); del.text = "X"
-                    del.setBackgroundColor(Color.parseColor("#FFC7C7"))
-                    del.layoutParams = LinearLayout.LayoutParams(0, -2, 0.4f)
-
-                    bm.setOnClickListener{
-                        if(item.qty > 1){ item.qty = item.qty - 1; refresh() }
-                    }
-                    bp.setOnClickListener{
-                        item.qty = item.qty + 1; refresh()
-                    }
-                    del.setOnClickListener{
-                        cart.remove(item); refresh()
-                    }
-                    row.addView(tv1); row.addView(tv2); row.addView(box); row.addView(tv5); row.addView(del)
-                    cartBox.addView(row)
-                    idx = idx + 1
-                }
-                tvTot.text = "Total " + String.format("%.2f", sub)
-                val recStr = eRec.text.toString()
-                var r = 0.0
-                val v = recStr.toDoubleOrNull()
-                if(v!= null) r = v
-                tvChange.text = "Change: " + String.format("%.2f", r - sub)
-                if(cart.size == 0){
-                    val em = TextView(this); em.text = "Cart empty - Search product"; em.gravity = Gravity.CENTER; em.setPadding(0,20,0,20)
-                    cartBox.addView(em)
-                }
-            }
-
-            btnSearch.setOnClickListener{
-                val q = eSearch.text.toString().trim()
-                if(q.length == 0) return@setOnClickListener
-                for(k in stock.keys){
-                    val it = stock[k]
-                    if(it!= null){
-                        if(it.code.toLowerCase().contains(q.toLowerCase()) || it.name.toLowerCase().contains(q.toLowerCase())){
-                            var found = false
-                            for(c in cart){ if(c.code == it.code){ c.qty = c.qty + 1; found = true } }
-                            if(!found){ cart.add(Item(it.name, it.code, it.cost, it.sell, 1)) }
-                            eSearch.setText("")
-                            refresh()
-                            break
-                        }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Search code / name - e.g. 1002 or milk") }, modifier = Modifier.fillMaxWidth())
+        if (search.isNotEmpty()) {
+            LazyColumn(Modifier.height(120.dp)) {
+                items(filtered) { (code, data) ->
+                    val (name, costPrice, stock) = data
+                    val price = costPrice.second
+                    Button(onClick = {
+                        val existing = cart.find { it.code == code }
+                        if (existing!= null) existing.qty++ else cart.add(CartItem(code, name, price, 1))
+                        onCartChange(cart.toMutableList()); search = ""
+                    }, Modifier.fillMaxWidth().padding(2.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))) {
+                        Text("$code - $name - $${price} - Stock $stock")
                     }
                 }
             }
-
-            eRec.addTextChangedListener(object: TextWatcher{
-                override fun afterTextChanged(s: Editable?){ refresh() }
-                override fun beforeTextChanged(a: CharSequence?, b: Int, c: Int, d: Int){}
-                override fun onTextChanged(a: CharSequence?, b: Int, c: Int, d: Int){}
-            })
-
-            bComplete.setOnClickListener{
-                val tot = getTotal()
-                if(cart.size == 0) return@setOnClickListener
-                var rec = 0.0
-                val vv = eRec.text.toString().toDoubleOrNull()
-                if(vv!= null) rec = vv
-                if(rec < tot){ Toast.makeText(this, "Less amount", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
-                cart.clear(); eRec.setText(""); refresh()
-                Toast.makeText(this, "Sold Change " + String.format("%.2f", rec - tot), Toast.LENGTH_LONG).show()
-            }
-
-            content.addView(eSearch)
-            content.addView(btnSearch)
-            content.addView(cartBox)
-            content.addView(tvTot)
-            content.addView(payRow)
-            content.addView(eRec)
-            content.addView(tvChange)
-            content.addView(bComplete)
-            if(isAdmin){ content.addView(btnBack) }
-
-            refresh()
         }
-
-        for(m in arrayOf("HOME","SALES","STOCK","REPORTS")){
-            val tv = TextView(this)
-            tv.text = " "+m+" "
-            tv.setTextColor(Color.WHITE)
-            tv.setPadding(12,18,12,18)
-            tv.setOnClickListener{
-                if(m=="SALES") showSales() else showHome()
+        Spacer(Modifier.height(8.dp))
+        Text("Cart: ${if(cart.isEmpty()) "Cart empty - Search product" else ""}", fontWeight = FontWeight.Bold)
+        LazyColumn(Modifier.weight(1f)) {
+            items(cart.toList()) { item ->
+                Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${item.code} ${item.name} x${item.qty} = ${String.format("%.2f", item.price*item.qty)}")
+                    Row {
+                        Button(onClick = { val c = cart.toMutableList(); val f = c.find { it.code == item.code }; if(f!=null){ if(f.qty>1) f.qty-- else c.remove(f); onCartChange(c) } }, modifier=Modifier.width(40.dp)) { Text("-") }
+                        Text(" ${item.qty} ", modifier = Modifier.padding(horizontal=4.dp))
+                        Button(onClick = { val c = cart.toMutableList(); c.find { it.code == item.code }?.let{ it.qty++ }; onCartChange(c) }, modifier=Modifier.width(40.dp)) { Text("+") }
+                    }
+                }
             }
-            drawer.addView(tv)
         }
+        Divider()
+        Text("TOTAL: $${String.format("%.2f", total)}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            OutlinedTextField(value = receivedText, onValueChange = { receivedText = it }, label = { Text("Received") }, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            Text("Change: $${String.format("%.2f", if(change>0) change else 0.0)}", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Button(onClick = {
+                if(total>0) {
+                    if(received >= total || role=="admin") {
+                        message = "Sold Change ${String.format("%.2f", change)}"; onCartChange(mutableListOf()); receivedText = ""
+                    } else message = "Insufficient cash"
+                }
+            }, Modifier.weight(1f).height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("COMPLETE SALE - CASH") }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                if(total>0) { message = "Sold ECOCASH"; onCartChange(mutableListOf()); receivedText = "" }
+            }, Modifier.weight(1f).height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2))) { Text("ECOCASH") }
+        }
+        if(message.isNotEmpty()) Text(message, color = Color.Green, fontWeight = FontWeight.Bold)
+    }
+}
 
-        scroll.addView(content)
-        root.addView(drawer)
-        root.addView(scroll)
-        setContentView(root)
+@Composable
+fun ReceivingScreen(stockMap: MutableMap<String, Triple<String, Pair<Double, Double>, Int>>, onStockUpdate: (MutableMap<String, Triple<String, Pair<Double, Double>, Int>>) -> Unit, history: MutableList<ReceivingRecord>, onHistoryUpdate: (MutableList<ReceivingRecord>) -> Unit, onBack: () -> Unit) {
+    var searchCode by remember { mutableStateOf("") }
+    var selectedCode by remember { mutableStateOf("") }
+    var selectedName by remember { mutableStateOf("") }
+    var currentStock by remember { mutableStateOf(0) }
+    var qty by remember { mutableStateOf("") }
+    var cost by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var supplier by remember { mutableStateOf("") }
+    var invoice by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf("") }
 
-        if(isAdmin){ showHome() } else { showSales() }
+    val filtered = stockMap.filter { it.key.contains(searchCode, true) || it.value.first.contains(searchCode, true) }.toList()
+
+    Column(Modifier.fillMaxSize().padding(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("RECEIVING", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Button(onClick = onBack) { Text("BACK") }
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(value = searchCode, onValueChange = { searchCode = it }, label = { Text("Search OUR SHOP CODE or name - e.g. 1002 milk") }, modifier = Modifier.fillMaxWidth())
+        if (searchCode.isNotEmpty() && selectedCode.isEmpty()) {
+            LazyColumn(Modifier.height(100.dp)) {
+                items(filtered) { (code, data) ->
+                    Button(onClick = {
+                        selectedCode = code; selectedName = data.first; currentStock = data.third
+                        cost = data.second.first.toString(); price = data.second.second.toString()
+                        searchCode = "$code - ${data.first}"
+                    }, Modifier.fillMaxWidth().padding(2.dp)) { Text("$code - ${data.first} - Stock:${data.third}") }
+                }
+            }
+        }
+        if(selectedCode.isNotEmpty() || searchCode.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
+                Column(Modifier.padding(10.dp)) {
+                    Text("Selected: ${if(selectedCode.isNotEmpty()) "$selectedCode - $selectedName" else "NEW PRODUCT (type new code above)"}", fontWeight = FontWeight.Bold)
+                    Text("Current Stock: $currentStock | Old Cost: $cost | Old Price: $price")
+                    Text("Our Shop Code: $selectedCode", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            if(selectedCode.isEmpty()) {
+                OutlinedTextField(value = selectedName, onValueChange = { selectedName = it }, label = { Text("New Product Name*") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = selectedCode, onValueChange = { selectedCode = it }, label = { Text("New Shop Code* e.g. 1025") }, modifier = Modifier.fillMaxWidth())
+            }
+            Row(Modifier.fillMaxWidth()) {
+                OutlinedTextField(value = qty, onValueChange = { qty = it }, label = { Text("Qty Received*") }, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(value = cost, onValueChange = { cost = it }, label = { Text("Cost (auto-picked)") }, modifier = Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth()) {
+                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Price (auto-picked)") }, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(value = supplier, onValueChange = { supplier = it }, label = { Text("Supplier (optional)") }, modifier = Modifier.weight(1f))
+            }
+            OutlinedTextField(value = invoice, onValueChange = { invoice = it }, label = { Text("Invoice No - NOT mandatory (black market allowed)") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            Button(onClick = {
+                val q = qty.toIntOrNull()?: 0
+                if(selectedCode.isEmpty() || q<=0) { msg = "Enter Code + Qty"; return@Button }
+                val c = cost.toDoubleOrNull()?: stockMap[selectedCode]?.second?.first?: 0.0
+                val p = price.toDoubleOrNull()?: stockMap[selectedCode]?.second?.second?: 0.0
+                val existing = stockMap[selectedCode]
+                val newStockQty = (existing?.third?: 0) + q
+                val nameToSave = if(selectedName.isNotEmpty()) selectedName else existing?.first?: "New Item"
+                val newMap = stockMap.toMutableMap()
+                newMap[selectedCode] = Triple(nameToSave, c to p, newStockQty)
+                onStockUpdate(newMap)
+                val sdf = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
+                val rec = ReceivingRecord(sdf.format(Date()), selectedCode, nameToSave, q, c, p, if(supplier.isEmpty()) "No Supplier" else supplier)
+                val newHist = history.toMutableList(); newHist.add(0, rec); onHistoryUpdate(newHist)
+                msg = "Received $q x $nameToSave - Stock now $newStockQty"
+                // clear
+                selectedCode = ""; selectedName = ""; qty = ""; searchCode = ""; currentStock = 0
+            }, Modifier.fillMaxWidth().height(55.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("RECEIVE STOCK", fontSize = 18.sp) }
+            if(msg.isNotEmpty()) Text(msg, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Today Received:", fontWeight = FontWeight.Bold)
+        LazyColumn(Modifier.weight(1f)) {
+            items(history.toList()) { r ->
+                Card(Modifier.fillMaxWidth().padding(2.dp)) {
+                    Column(Modifier.padding(6.dp)) {
+                        Text("${r.date} | ${r.code} ${r.name} x${r.qty} Cost:${r.cost} Price:${r.price}", fontSize = 12.sp)
+                        Text("Supplier: ${r.supplier}", fontSize = 10.sp, color = Color.Gray)
+                    }
+                }
+            }
+        }
     }
 }
