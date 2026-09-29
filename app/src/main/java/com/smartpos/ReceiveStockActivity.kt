@@ -9,7 +9,7 @@ import android.app.AlertDialog
 
 data class ReceiveItem(var name:String, var code:String, var cost:Double, var selling:Double, var qty:Int)
 
-class ReceiveStockActivity : AppCompatActivity() {
+class ReceiveStockActivity : android.app.Activity() {
 
     private val items = mutableListOf<ReceiveItem>()
     private lateinit var tableContainer: LinearLayout
