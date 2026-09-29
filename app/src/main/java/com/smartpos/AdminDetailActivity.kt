@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AdminDetailActivity : AppCompatActivity() {
+class AdminDetailActivity : android..app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
