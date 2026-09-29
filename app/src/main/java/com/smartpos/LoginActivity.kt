@@ -1,4 +1,4 @@
-package com.smartshop.posv5
+package com.smartpos
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
