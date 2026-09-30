@@ -19,7 +19,8 @@
         <activity android:name=".AdminActivity" android:exported="false" />
         <activity android:name=".AdminDetailActivity" android:exported="false" />
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
-
+        <activity android:name=".BranchesActivity" />
+        <activity android:name=".StockTransferActivity" />
     </application>
 
 </manifest>
