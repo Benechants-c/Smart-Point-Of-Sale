@@ -31,21 +31,21 @@ class AdminDetailActivity : Activity() {
         super.onCreate(b)
         val title=intent.getStringExtra("TITLE")?:"Admin"
 
-        // ===== REAL ONLY FIX - NO DEMO - BRANCHES & TRANSFER =====
-        if(title.contains("BRANCH", true) || title.contains("SHOP", true)){
-            try {
-                startActivity(Intent(this, BranchesActivity::class.java))
-            } catch(e: Exception){
-                Toast.makeText(this, "Open Branches: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-            finish()
-            return
-        }
+        // ===== BUILD 127 REAL ONLY - CORRECT ORDER =====
         if(title.contains("TRANSFER", true)){
             try {
                 startActivity(Intent(this, StockTransferActivity::class.java))
             } catch(e: Exception){
                 Toast.makeText(this, "Open Transfer: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            finish()
+            return
+        }
+        if(title.contains("BRANCH", true) || title.contains("SHOP", true)){
+            try {
+                startActivity(Intent(this, BranchesActivity::class.java))
+            } catch(e: Exception){
+                Toast.makeText(this, "Open Branches: ${e.message}", Toast.LENGTH_LONG).show()
             }
             finish()
             return
@@ -98,7 +98,7 @@ class AdminDetailActivity : Activity() {
                     val s=numDec("");s.hint="Selling e.g. 8.00";dlg.addView(romLabel("Selling"));dlg.addView(s)
                     val q=numInt("");q.hint="Quantity * e.g. 10";dlg.addView(romLabel("Quantity * REQUIRED"));dlg.addView(q)
                     android.app.AlertDialog.Builder(this@AdminDetailActivity).setTitle("Add Product").setView(dlg)
-                      .setPositiveButton("ADD"){_,_->
+                     .setPositiveButton("ADD"){_,_->
                             val name=n.text.toString().trim()
                             if(name.isEmpty()){Toast.makeText(this@AdminDetailActivity,"❌ Name required!",Toast.LENGTH_LONG).show();return@setPositiveButton}
                             val code=co.text.toString().trim().ifEmpty{"N/A"}
