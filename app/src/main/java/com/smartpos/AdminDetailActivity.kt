@@ -30,6 +30,28 @@ class AdminDetailActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         val title=intent.getStringExtra("TITLE")?:"Admin"
+
+        // ===== REAL ONLY FIX - NO DEMO - BRANCHES & TRANSFER =====
+        if(title.contains("BRANCH", true) || title.contains("SHOP", true)){
+            try {
+                startActivity(Intent(this, BranchesActivity::class.java))
+            } catch(e: Exception){
+                Toast.makeText(this, "Open Branches: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            finish()
+            return
+        }
+        if(title.contains("TRANSFER", true)){
+            try {
+                startActivity(Intent(this, StockTransferActivity::class.java))
+            } catch(e: Exception){
+                Toast.makeText(this, "Open Transfer: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            finish()
+            return
+        }
+        // ===== END FIX =====
+
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(10,10,10,10)}
         val head=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,10,12)}
         head.addView(TextView(this).apply{text=title.uppercase();setTextColor(Color.WHITE);textSize=16f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)})
@@ -76,7 +98,7 @@ class AdminDetailActivity : Activity() {
                     val s=numDec("");s.hint="Selling e.g. 8.00";dlg.addView(romLabel("Selling"));dlg.addView(s)
                     val q=numInt("");q.hint="Quantity * e.g. 10";dlg.addView(romLabel("Quantity * REQUIRED"));dlg.addView(q)
                     android.app.AlertDialog.Builder(this@AdminDetailActivity).setTitle("Add Product").setView(dlg)
-                       .setPositiveButton("ADD"){_,_->
+                      .setPositiveButton("ADD"){_,_->
                             val name=n.text.toString().trim()
                             if(name.isEmpty()){Toast.makeText(this@AdminDetailActivity,"❌ Name required!",Toast.LENGTH_LONG).show();return@setPositiveButton}
                             val code=co.text.toString().trim().ifEmpty{"N/A"}
