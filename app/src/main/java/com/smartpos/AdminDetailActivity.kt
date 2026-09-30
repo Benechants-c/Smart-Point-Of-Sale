@@ -31,26 +31,15 @@ class AdminDetailActivity : Activity() {
         super.onCreate(b)
         val title=intent.getStringExtra("TITLE")?:"Admin"
 
-        // ===== BUILD 127 REAL ONLY - CORRECT ORDER =====
+        // ===== BUILD 128 REAL ONLY - CORRECT ORDER - TRANSFER FIRST =====
         if(title.contains("TRANSFER", true)){
-            try {
-                startActivity(Intent(this, StockTransferActivity::class.java))
-            } catch(e: Exception){
-                Toast.makeText(this, "Open Transfer: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-            finish()
-            return
+            try { startActivity(Intent(this, StockTransferActivity::class.java)) } catch(e: Exception){ Toast.makeText(this, "Transfer: ${e.message}", Toast.LENGTH_LONG).show() }
+            finish(); return
         }
         if(title.contains("BRANCH", true) || title.contains("SHOP", true)){
-            try {
-                startActivity(Intent(this, BranchesActivity::class.java))
-            } catch(e: Exception){
-                Toast.makeText(this, "Open Branches: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-            finish()
-            return
+            try { startActivity(Intent(this, BranchesActivity::class.java)) } catch(e: Exception){ Toast.makeText(this, "Branches: ${e.message}", Toast.LENGTH_LONG).show() }
+            finish(); return
         }
-        // ===== END FIX =====
 
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(10,10,10,10)}
         val head=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,10,12)}
@@ -110,7 +99,7 @@ class AdminDetailActivity : Activity() {
                             if(qty<=0){Toast.makeText(this@AdminDetailActivity,"❌ Qty must be >0 integer!",Toast.LENGTH_LONG).show();return@setPositiveButton}
                             grnProducts.add(ProductLine(name,code,cost,sell,qty))
                             refreshTable()
-                            Toast.makeText(this@AdminDetailActivity,"✅ $name x$qty ADDED! See table below",Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@AdminDetailActivity,"✅ $name x$qty ADDED!",Toast.LENGTH_LONG).show()
                         }.setNegativeButton("CANCEL",null).show()
                 }
             })
@@ -128,7 +117,7 @@ class AdminDetailActivity : Activity() {
                 if(grnProducts.isEmpty()){Toast.makeText(this@AdminDetailActivity,"Add products first!",Toast.LENGTH_SHORT).show();return@setOnClickListener}
                 val prodPrefs=getSharedPreferences("products_db",0);val all=prodPrefs.all;val byCode=mutableMapOf<String,String>();val byName=mutableMapOf<String,String>()
                 all.forEach{(k,v)->try{val s=v.toString();var code="";var name="";if(s.trim().startsWith("{")){val j=JSONObject(s);name=j.optString("name");code=j.optString("code")}else{val p=s.split("|");name=p[0];code=p.getOrNull(1)?:""};if(code.isNotEmpty()&&code.uppercase()!="N/A")byCode[code.lowercase()]=k;if(name.isNotEmpty())byName[name.lowercase()]=k}catch(_:Exception){}}
-                val ed=prodPrefs.edit();grnProducts.forEachIndexed{idx,p->val isReal=p.code.uppercase()!="N/A"&&p.code.isNotBlank();val ex=if(isReal)byCode[p.code.lowercase()]?:byName[p.name.lowercase()] else byName[p.name.lowercase()];if(ex!=null){try{val old=all[ex].toString();var oq=0;var oc=0.0;var os=0.0;if(old.trim().startsWith("{")){val j=JSONObject(old);oq=j.optInt("qty",0);oc=j.optDouble("cost",0.0);os=j.optDouble("sell",0.0)}else{val pp=old.split("|");oq=pp.getOrNull(4)?.toIntOrNull()?:0;oc=pp.getOrNull(2)?.toDoubleOrNull()?:0.0;os=pp.getOrNull(3)?.toDoubleOrNull()?:0.0};val nq=oq+p.qty;val avg=if(oq>0)((oc*oq)+(p.cost*p.qty))/nq else p.cost;val fs=if(p.sell>0)p.sell else os;val nj=JSONObject();nj.put("name",p.name);nj.put("code",p.code);nj.put("cost",avg);nj.put("sell",fs);nj.put("qty",nq);ed.putString(ex,nj.toString())}catch(_:Exception){}}else{val sc=p.code.replace(" ","_").replace("|","_").ifEmpty{"NA"};val uk="P_${sc}_${System.currentTimeMillis()}_${keyCounter.incrementAndGet()}_${idx}";val nj=JSONObject();nj.put("name",p.name);nj.put("code",p.code);nj.put("cost",p.cost);nj.put("sell",p.sell);nj.put("qty",p.qty);ed.putString(uk,nj.toString())}};ed.apply();getSharedPreferences("grn_db",0).edit().putString(grnNo,"${sup.text}|${inv.text}|${grnProducts.size}").apply();getSharedPreferences("grn_drafts",0).edit().remove(grnNo).apply();Toast.makeText(this@AdminDetailActivity,"GRN GRN-$grnNo COMPLETED! ${grnProducts.size} items added to stock",Toast.LENGTH_LONG).show();grnProducts.clear();refreshTable();grnNo=grnNum();grn.setText("GRN-$grnNo")
+                val ed=prodPrefs.edit();grnProducts.forEachIndexed{idx,p->val isReal=p.code.uppercase()!="N/A"&&p.code.isNotBlank();val ex=if(isReal)byCode[p.code.lowercase()]?:byName[p.name.lowercase()] else byName[p.name.lowercase()];if(ex!=null){try{val old=all[ex].toString();var oq=0;var oc=0.0;var os=0.0;if(old.trim().startsWith("{")){val j=JSONObject(old);oq=j.optInt("qty",0);oc=j.optDouble("cost",0.0);os=j.optDouble("sell",0.0)}else{val pp=old.split("|");oq=pp.getOrNull(4)?.toIntOrNull()?:0;oc=pp.getOrNull(2)?.toDoubleOrNull()?:0.0;os=pp.getOrNull(3)?.toDoubleOrNull()?:0.0};val nq=oq+p.qty;val avg=if(oq>0)((oc*oq)+(p.cost*p.qty))/nq else p.cost;val fs=if(p.sell>0)p.sell else os;val nj=JSONObject();nj.put("name",p.name);nj.put("code",p.code);nj.put("cost",avg);nj.put("sell",fs);nj.put("qty",nq);ed.putString(ex,nj.toString())}catch(_:Exception){}}else{val sc=p.code.replace(" ","_").replace("|","_").ifEmpty{"NA"};val uk="P_${sc}_${System.currentTimeMillis()}_${keyCounter.incrementAndGet()}_${idx}";val nj=JSONObject();nj.put("name",p.name);nj.put("code",p.code);nj.put("cost",p.cost);nj.put("sell",p.sell);nj.put("qty",p.qty);ed.putString(uk,nj.toString())}};ed.apply();getSharedPreferences("grn_db",0).edit().putString(grnNo,"${sup.text}|${inv.text}|${grnProducts.size}").apply();getSharedPreferences("grn_drafts",0).edit().remove(grnNo).apply();Toast.makeText(this@AdminDetailActivity,"GRN GRN-$grnNo COMPLETED! ${grnProducts.size} items added",Toast.LENGTH_LONG).show();grnProducts.clear();refreshTable();grnNo=grnNum();grn.setText("GRN-$grnNo")
             }})
             card.addView(bottom);root.addView(card)
         } else {
