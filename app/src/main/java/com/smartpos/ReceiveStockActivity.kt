@@ -17,7 +17,6 @@ class ReceiveStockActivity : Activity() {
     private val list = mutableListOf<Line>()
     private lateinit var totalView: TextView
     private lateinit var table: LinearLayout
-    // ONE EDIT ONLY - SHOP PICKER
     private lateinit var spinnerShop: Spinner
     private val shops = mutableListOf<Pair<String,String>>()
     private fun getSelectedShopId(): String = if(spinnerShop.selectedItemPosition in shops.indices) shops[spinnerShop.selectedItemPosition].first else "main"
@@ -42,7 +41,7 @@ class ReceiveStockActivity : Activity() {
             }
             c.close(); db.close()
         } catch (e: Exception) {}
-        return out.distinctBy { it.code }
+        return out.distinctBy { it.code.lowercase() }
     }
 
     private fun refresh() {
@@ -64,12 +63,10 @@ class ReceiveStockActivity : Activity() {
         try {
             val db = openOrCreateDatabase("products_db", Context.MODE_PRIVATE, null)
             db.execSQL("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, code TEXT, cost REAL, price REAL, qty INTEGER)")
-            // Try add shop_id column if not exists - REAL MULTI-SHOP
             try{ db.execSQL("ALTER TABLE products ADD COLUMN shop_id TEXT") }catch(_:Exception){}
             val shopId = getSelectedShopId()
             for (l in list) {
                 db.execSQL("INSERT INTO products(name,code,cost,price,qty,shop_id) VALUES('" + l.name.replace("'","") + "','" + l.code + "'," + l.cost + "," + l.sell + "," + l.qty + ",'" + shopId + "')")
-                // ALSO save to inventory for TRANSFER to see it - REAL
                 try{
                     val inv = getSharedPreferences("inventory_db", Context.MODE_PRIVATE)
                     val invKey = "${shopId}_${l.code}".lowercase()
@@ -90,7 +87,6 @@ class ReceiveStockActivity : Activity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        // Load shops - handles JSON {"id":"karoi_b","name":"chiedza"}
         try{
             val prefsShops = getSharedPreferences("shops_db", Context.MODE_PRIVATE)
             prefsShops.all.forEach { (keyId, value) ->
@@ -110,9 +106,8 @@ class ReceiveStockActivity : Activity() {
         if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE) }
-        root.addView(TextView(this).apply { text = "RECEIVE STOCK - BUILD 137 ORIGINAL + SHOP"; textSize = 18f; setTypeface(null, Typeface.BOLD); setPadding(0,0,0,10) })
+        root.addView(TextView(this).apply { text = "RECEIVE STOCK - BUILD 145 NO OVERRIDE"; textSize = 18f; setTypeface(null, Typeface.BOLD); setPadding(0,0,0,10) })
 
-        // === ONE EDIT ONLY - SHOP DROPDOWN AT TOP ===
         root.addView(label("SELECT SHOP TO RECEIVE *"))
         spinnerShop = Spinner(this)
         spinnerShop.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shops.map{it.second})
@@ -138,8 +133,8 @@ class ReceiveStockActivity : Activity() {
         val all = getAllProducts()
         val nameList = all.map { it.name }.distinct()
         val codeList = all.map { it.code }.distinct()
-        val byName = all.associateBy { it.name }
-        val byCode = all.associateBy { it.code }
+        val byName = all.associateBy { it.name.lowercase() }
+        val byCode = all.associateBy { it.code.lowercase() }
 
         val dlg = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24,20,24,20) }
 
@@ -154,16 +149,16 @@ class ReceiveStockActivity : Activity() {
         val costInput = EditText(this).apply { hint = "Cost *"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(20,14,20,14) }
         val sellInput = EditText(this).apply { hint = "Sell *"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(20,14,20,14) }
         val qtyInput = EditText(this).apply { hint = "Qty *"; inputType = InputType.TYPE_CLASS_NUMBER; setPadding(20,14,20,14) }
-        val err = TextView(this).apply { setTextColor(Color.RED) }
+        val err = TextView(this).apply { setTextColor(Color.RED); textSize = 13f; setTypeface(null, Typeface.BOLD) }
 
         nameInput.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
             val sel = nameInput.adapter.getItem(pos).toString()
-            val p = byName[sel]
+            val p = byName[sel.lowercase()]
             if (p!= null) { codeInput.setText(p.code); costInput.setText(p.cost.toString()); sellInput.setText(p.price.toString()) }
         }
         codeInput.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
             val sel = codeInput.adapter.getItem(pos).toString()
-            val p = byCode[sel]
+            val p = byCode[sel.lowercase()]
             if (p!= null) { nameInput.setText(p.name); costInput.setText(p.cost.toString()); sellInput.setText(p.price.toString()) }
         }
 
@@ -174,17 +169,33 @@ class ReceiveStockActivity : Activity() {
         dlg.addView(label("Quantity *")); dlg.addView(qtyInput)
         dlg.addView(err)
 
-        val d = AlertDialog.Builder(this).setTitle("Add Product - BUILD 122 - NO DUPLICATES").setView(dlg).setPositiveButton("ADD", null).setNegativeButton("CANCEL", null).create()
+        val d = AlertDialog.Builder(this).setTitle("Add Product - BUILD 145 - BLOCK DUPLICATE CODE").setView(dlg).setPositiveButton("ADD", null).setNegativeButton("CANCEL", null).create()
         d.show()
         d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val n = nameInput.text.toString().trim(); val c = codeInput.text.toString().trim()
             val coS = costInput.text.toString().trim(); val seS = sellInput.text.toString().trim(); val qS = qtyInput.text.toString().trim()
             if (n.isEmpty() || c.isEmpty() || coS.isEmpty() || seS.isEmpty() || qS.isEmpty()) { err.text = "All fields required"; return@setOnClickListener }
 
+            // === FIX 1: BLOCK IF CODE ALREADY EXISTS IN DB WITH DIFFERENT NAME ===
+            val existsInDb = all.find { it.code.equals(c, ignoreCase = true) }
+            if (existsInDb != null) {
+                if (!existsInDb.name.equals(n, ignoreCase = true)) {
+                    err.text = "❌ CODE ALREADY EXISTS: Code '$c' already belongs to '${existsInDb.name}'. Use different code!"
+                    Toast.makeText(this@ReceiveStockActivity, "❌ CODE ALREADY EXISTS: $c is for ${existsInDb.name}", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                // If same code + same name, allow - but update qty in current list
+            }
+
+            // Check current receive list - merge if same code
             val existing = list.find { it.code.equals(c, true) }
             if (existing!= null) {
+                // Only merge if name matches - otherwise block
+                if (!existing.name.equals(n, true)) {
+                    err.text = "❌ CODE ALREADY EXISTS in this GRN: $c is ${existing.name}"
+                    return@setOnClickListener
+                }
                 existing.qty += qS.toInt()
-                existing.name = n
                 existing.cost = coS.toDouble()
                 existing.sell = seS.toDouble()
                 refresh()
