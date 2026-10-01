@@ -2,165 +2,149 @@ package com.smartpos
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
-import android.view.Gravity
 import android.widget.*
 
-class AdminDetailActivity : Activity() {
-    override fun onCreate(b: Bundle?) {
-        super.onCreate(b)
-        try{
-            val title = intent.getStringExtra("TITLE")?: "Admin"
+class AdminActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        try {
             val scroll = ScrollView(this)
-            val root = LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,12,12,12)}
-
-            val header = TextView(this).apply{
-                text = title; textSize=20f; setTypeface(null,Typeface.BOLD)
-                setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(20,24,20,24)
+            val root = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#F8FAFC"))
             }
+            val header = LinearLayout(this).apply {
+                setBackgroundColor(Color.parseColor("#1E293B"))
+                setPadding(30,40,30,30)
+                orientation = LinearLayout.HORIZONTAL
+            }
+            val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
+            headerText.addView(TextView(this).apply { text = "🏪 Smartpos"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
+            headerText.addView(TextView(this).apply { text = "Admin Dashboard • Main Shop"; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")) })
+            val avatar = TextView(this).apply { text = "👤"; textSize = 28f; setBackgroundColor(Color.parseColor("#334155")); setPadding(16,8,16,8) }
+            header.addView(headerText); header.addView(avatar)
             root.addView(header)
-            val back = Button(this).apply{text="← Back to Dashboard"; setBackgroundColor(Color.parseColor("#E2E8F0"))}
-            back.setOnClickListener{ finish() }; root.addView(back)
 
-            // PREFS
-            val salesPref = getSharedPreferences("sales_db",Context.MODE_PRIVATE)
-            val prodPref = getSharedPreferences("products_db",Context.MODE_PRIVATE)
-            val custPref = getSharedPreferences("customers",Context.MODE_PRIVATE)
-            val cashPref = getSharedPreferences("cash",Context.MODE_PRIVATE)
-            val auditPref = getSharedPreferences("audit",Context.MODE_PRIVATE)
-            val supplierPref = getSharedPreferences("suppliers",Context.MODE_PRIVATE)
-            val userPref = getSharedPreferences("users_db",Context.MODE_PRIVATE)
+            val prefsSales = getSharedPreferences("sales_db", Context.MODE_PRIVATE)
+            val prefsProducts = getSharedPreferences("products_db", Context.MODE_PRIVATE)
+            val prefsCustomers = getSharedPreferences("customers", Context.MODE_PRIVATE)
+            val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
 
-            fun addCard(t:String, v:String){
-                val card = LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,8,0,0)}}
-                card.addView(TextView(this).apply{text=t; setTypeface(null,Typeface.BOLD)})
-                card.addView(TextView(this).apply{text=v; setPadding(0,8,0,0)})
-                root.addView(card)
+            val today = "29/09/2026"
+            var todaySales = 0f; var profit = 0f
+            try{
+                prefsSales.all.forEach {
+                    val parts = it.value.toString().split("|")
+                    if(parts.size>=3 && parts[0]==today) { todaySales += parts[1].toFloatOrNull()?:0f; profit += (parts[1].toFloatOrNull()?:0f) - (parts[2].toFloatOrNull()?:0f) }
+                }
+            }catch(_:Exception){}
+            var stockValue = 0f; var lowStock = 0; var prodCount = prefsProducts.all.size
+            try{
+                prefsProducts.all.forEach {
+                    val p = it.value.toString().split("|")
+                    val qty = p.getOrNull(3)?.toFloatOrNull()?:0f; val buy = p.getOrNull(1)?.toFloatOrNull()?:0f
+                    stockValue += qty * buy; if(qty < 5) lowStock++
+                }
+            }catch(_:Exception){}
+            val custCount = prefsCustomers.all.size
+            val drawer = prefsCash.getFloat("drawer", 1245.6f)
+
+            val dateRow = LinearLayout(this).apply { setPadding(24,16,24,8); orientation = LinearLayout.HORIZONTAL }
+            dateRow.addView(TextView(this).apply { text = "Overview"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")); layoutParams = LinearLayout.LayoutParams(0,-2,1f) })
+            dateRow.addView(TextView(this).apply { text = "📅 Today, $today"; textSize = 12f; setTextColor(Color.parseColor("#64748B")) })
+            root.addView(dateRow)
+
+            fun kpiCard(bg:String, icon:String, title:String, value:String, sub:String, subColor:String): LinearLayout {
+                return LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundColor(Color.parseColor(bg))
+                    setPadding(20,20,20,20)
+                    layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(8,8,8,8) }
+                    addView(TextView(this@AdminActivity).apply { text = icon; textSize = 22f; gravity = android.view.Gravity.CENTER })
+                    addView(TextView(this@AdminActivity).apply { text = title; textSize = 11f; gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor("#334155")) })
+                    addView(TextView(this@AdminActivity).apply { text = value; textSize = 16f; setTypeface(null, Typeface.BOLD); gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor("#0F172A")) })
+                    addView(TextView(this@AdminActivity).apply { text = sub; textSize = 9f; gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor(subColor)) })
+                }
             }
+            val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
+            row1.addView(kpiCard("#BBF7D0","📈","Today's Sales","$${String.format("%.2f",todaySales)}","+ REAL","#16A34A"))
+            row1.addView(kpiCard("#BFDBFE","💰","Profit","$${String.format("%.2f",profit)}","REAL","#2563EB"))
+            row1.addView(kpiCard("#DDD6FE","🏠","Stock Value","$${String.format("%.0f",stockValue)}","REAL","#7C3AED"))
+            val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,12) }
+            row2.addView(kpiCard(if(lowStock>0)"#FECACA" else "#BBF7D0", if(lowStock>0)"⚠️" else "✅","Low Stock","$lowStock Items", if(lowStock>0)"Needs restock" else "All OK", if(lowStock>0)"#DC2626" else "#16A34A"))
+            row2.addView(kpiCard("#A5F3FC","📦","Products","$prodCount","Active SKUs","#0F172A"))
+            row2.addView(kpiCard("#FED7AA","👥","Customers","$custCount","REAL","#EA580C"))
+            root.addView(row1); root.addView(row2)
 
-            when{
-                title.contains("Sales Management") -> {
-                    root.addView(TextView(this).apply{text="Sales List - REAL DATA"; setTypeface(null,Typeface.BOLD); setPadding(0,12,0,8)})
-                    if(salesPref.all.isEmpty()) addCard("No Sales","Do first sale in POS Sales")
-                    else salesPref.all.forEach{ (k,v) ->
-                        addCard(k, v.toString())
-                    }
-                    val totalSales = salesPref.all.values.sumOf{
-                        try{ it.toString().split("|")[1].toFloat().toDouble()}catch(_:Exception){0.0}
-                    }
-                    addCard("TOTAL SALES","$${String.format("%.2f",totalSales)}")
-                }
-                title.contains("Customer") -> {
-                    val nameEd = EditText(this).apply{hint="Customer Name / Phone"}
-                    val save = Button(this).apply{text="ADD CUSTOMER"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE)}
-                    save.setOnClickListener{
-                        if(nameEd.text.isNotEmpty()){
-                            custPref.edit().putString("${System.currentTimeMillis()}",nameEd.text.toString()).apply()
-                            Toast.makeText(this,"Customer Added",0).show(); nameEd.setText("")
-                            root.addView(TextView(this).apply{text="• ${nameEd.text}"})
-                        }
-                    }
-                    root.addView(nameEd); root.addView(save)
-                    root.addView(TextView(this).apply{text="Customers (${custPref.all.size})"; setTypeface(null,Typeface.BOLD); setPadding(0,12,0,0)})
-                    custPref.all.values.forEach{ root.addView(TextView(this).apply{text="• $it"; setPadding(12,6,12,6); setBackgroundColor(Color.WHITE)}) }
-                }
-                title.contains("Cash") -> {
-                    val drawer = cashPref.getFloat("drawer",1245.6f)
-                    addCard("Cash Drawer","$${String.format("%.2f",drawer)} - REAL")
-                    val ed = EditText(this).apply{hint="Adjust Drawer Amount"; inputType=8194}
-                    val btn = Button(this).apply{text="UPDATE DRAWER"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)}
-                    btn.setOnClickListener{
-                        val v = ed.text.toString().toFloatOrNull()?:0f
-                        cashPref.edit().putFloat("drawer",v).apply(); Toast.makeText(this,"Drawer Updated",0).show()
-                    }
-                    root.addView(ed); root.addView(btn)
-                }
-                title.contains("Users") -> {
-                    val ed = EditText(this).apply{hint="Username"}
-                    val role = EditText(this).apply{hint="Role - admin/cashier"}
-                    val btn = Button(this).apply{text="ADD USER"; setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE)}
-                    btn.setOnClickListener{
-                        if(ed.text.isNotEmpty()){
-                            userPref.edit().putString(ed.text.toString(),role.text.toString().ifEmpty{"cashier"}).apply()
-                            Toast.makeText(this,"User Added: ${ed.text}",0).show()
-                        }
-                    }
-                    root.addView(ed); root.addView(role); root.addView(btn)
-                    userPref.all.forEach{ addCard(it.key, "Role: ${it.value}") }
-                }
-                title.contains("Purchasing") -> {
-                    root.addView(TextView(this).apply{text="+ ADD PRODUCT - REAL"; setTypeface(null,Typeface.BOLD)})
-                    val code = EditText(this).apply{hint="Barcode"}; val name = EditText(this).apply{hint="Product Name"}
-                    val buy = EditText(this).apply{hint="Buy Price"; inputType=8194}; val sell = EditText(this).apply{hint="Sell Price"; inputType=8194}
-                    val qty = EditText(this).apply{hint="Qty"; inputType=2}
-                    val save = Button(this).apply{text="SAVE PRODUCT"; setBackgroundColor(Color.parseColor("#22C55E")); setTextColor(Color.WHITE)}
-                    save.setOnClickListener{
-                        if(code.text.isNotEmpty() && name.text.isNotEmpty()){
-                            prodPref.edit().putString(code.text.toString(),"${name.text}|${buy.text}|${sell.text}|${qty.text}|0|General").apply()
-                            // also sync to stock_main for POS
-                            getSharedPreferences("stock_main",Context.MODE_PRIVATE).edit().putString(code.text.toString(),"${name.text}|${buy.text}|${sell.text}|${qty.text}|0|General").apply()
-                            Toast.makeText(this,"Product Saved",0).show()
-                        }
-                    }
-                    for(v in listOf(code,name,buy,sell,qty)) root.addView(v); root.addView(save)
-                    root.addView(TextView(this).apply{text="Add Supplier"; setTypeface(null,Typeface.BOLD); setPadding(0,16,0,0)})
-                    val supEd = EditText(this).apply{hint="Supplier Name"}
-                    val supBtn = Button(this).apply{text="ADD SUPPLIER"; setBackgroundColor(Color.parseColor("#FB923C")); setTextColor(Color.WHITE)}
-                    supBtn.setOnClickListener{
-                        supplierPref.edit().putString("${System.currentTimeMillis()}",supEd.text.toString()).apply()
-                        Toast.makeText(this,"Supplier Added",0).show()
-                    }
-                    root.addView(supEd); root.addView(supBtn)
-                }
-                title.contains("Report") -> {
-                    var sales=0.0; var profit=0.0
-                    salesPref.all.values.forEach{
-                        try{ val p=it.toString().split("|"); sales+=p[1].toFloat(); profit+=p[1].toFloat()-p[2].toFloat()}catch(_:Exception){}
-                    }
-                    addCard("Today Sales","$${String.format("%.2f",sales)}"); addCard("Total Profit","$${String.format("%.2f",profit)}")
-                    addCard("Products", "${prodPref.all.size} Active SKUs")
-                    addCard("Stock Value", "$${prodPref.all.values.sumOf{ try{ val p=it.toString().split("|"); p[3].toFloat()*p[1].toFloat().toDouble()}catch(_:Exception){0.0}}.toInt()}")
-                }
-                title.contains("Audit") -> {
-                    val logs = auditPref.getStringSet("logs", mutableSetOf())?: setOf()
-                    if(logs.isEmpty()) addCard("Audit Log","No activity yet")
-                    else logs.forEach{ addCard("Log", it) }
-                }
-                title.contains("Price") -> {
-                    prodPref.all.forEach{ (code,value) ->
-                        val p = value.toString().split("|")
-                        val row = LinearLayout(this).apply{ orientation=LinearLayout.HORIZONTAL; setBackgroundColor(Color.WHITE); setPadding(12,12,12,12); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,4,0,0)}}
-                        row.addView(TextView(this).apply{text="${p.getOrNull(0)} - $${p.getOrNull(2)}"; layoutParams=LinearLayout.LayoutParams(0,-2,1f)})
-                        val edit = Button(this).apply{text="Edit Price"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)}
-                        edit.setOnClickListener{
-                            val dlg = android.app.Dialog(this); val l = LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
-                            val newSell = EditText(this).apply{hint="New Sell Price - ${p.getOrNull(2)}"}; l.addView(newSell)
-                            val sv = Button(this).apply{text="SAVE"}; sv.setOnClickListener{
-                                val np = p.toMutableList(); np[2]=newSell.text.toString()
-                                prodPref.edit().putString(code,np.joinToString("|")).apply()
-                                getSharedPreferences("stock_main",Context.MODE_PRIVATE).edit().putString(code,np.joinToString("|")).apply()
-                                Toast.makeText(this,"Price Updated",0).show(); dlg.dismiss()
-                            }
-                            l.addView(sv); dlg.setContentView(l); dlg.show()
-                        }
-                        row.addView(edit); root.addView(row)
-                    }
-                }
-                title.contains("Setting") -> {
-                    val clearSales = Button(this).apply{text="CLEAR SALES DATA"; setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE)}
-                    clearSales.setOnClickListener{ salesPref.edit().clear().apply(); Toast.makeText(this,"Sales Cleared",0).show() }
-                    val clearAll = Button(this).apply{text="RESET APP"; setBackgroundColor(Color.parseColor("#000")); setTextColor(Color.WHITE)}
-                    clearAll.setOnClickListener{ prodPref.edit().clear().apply(); salesPref.edit().clear().apply(); custPref.edit().clear().apply(); Toast.makeText(this,"Reset Done",0).show() }
-                    root.addView(clearSales); root.addView(clearAll)
-                }
-                else -> addCard(title,"Fully Functional - No Coming Soon")
+            root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,8,24,8) })
+            fun quickRow(b1:Button, b2:Button, b3:Button): LinearLayout {
+                val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
+                b1.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b2.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b3.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}
+                r.addView(b1); r.addView(b2); r.addView(b3); return r
             }
+            fun qBtn(text:String, color:String, action:()->Unit): Button {
+                return Button(this).apply { this.text = text; setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE); textSize = 11f; setOnClickListener{ action() } }
+            }
+            // KEEP YOUR 3 DONE FIELDS SAFE
+            val qa1 = quickRow(
+                qBtn("🚚 + Receive Stock","#2563EB"){ try{ startActivity(Intent(this, ReceiveStockActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"ReceiveStock: ${e.message}",1).show(); openSection("Purchasing") } },
+                qBtn("📦 + Add Product","#22C55E"){ openSection("Add Product") },
+                qBtn("🛒 + New Sale","#A855F7"){ try{ startActivity(Intent(this, SalesActivity::class.java)) }catch(_:Exception){ openSection("Sales Management") } }
+            )
+            val qa2 = quickRow(
+                qBtn("🔄 Stock Transfer","#0D9488"){ try{ startActivity(Intent(this, StockTransferActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"Transfer: ${e.message}",1).show(); openSection("Purchasing") } },
+                qBtn("🏢 Add Supplier","#FB923C"){ openSection("Purchasing") },
+                qBtn("👤 + Add User","#1E293B"){ openSection("Users & Permissions") }
+            )
+            root.addView(qa1); root.addView(qa2)
 
-            scroll.addView(root); setContentView(scroll)
-        }catch(e:Exception){
-            val tv = TextView(this); tv.text="Error: ${e.message}\n${e.stackTraceToString()}"; setContentView(tv)
+            root.addView(TextView(this).apply { text = "Admin Menu"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
+            fun menuGroup(title:String, icon:String, items:List<Pair<String,String>>): LinearLayout {
+                val group = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,8,16,8)} }
+                group.addView(TextView(this).apply { text = "$icon $title"; textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")) })
+                items.forEach { (name, target) ->
+                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,16,12,16) }
+                    row.addView(TextView(this).apply { text = name; textSize = 13f; layoutParams = LinearLayout.LayoutParams(0,-2,1f); setTextColor(Color.parseColor("#334155")) })
+                    row.addView(TextView(this).apply { text = ">"; setTextColor(Color.parseColor("#94A3B8")) })
+                    row.setOnClickListener { openSection(target) }
+                    group.addView(row)
+                    group.addView(TextView(this).apply { text = ""; setBackgroundColor(Color.parseColor("#F1F5F9")); layoutParams = LinearLayout.LayoutParams(-1,2) })
+                }
+                return group
+            }
+            root.addView(menuGroup("Sales","📊", listOf("Sales Management" to "Sales Management","Customers" to "Customers","Cash Drawer $${String.format("%.2f",drawer)}" to "Cash Management")))
+            root.addView(menuGroup("Management","⚙️", listOf("Users & Permissions" to "Users & Permissions","Branches / Shops" to "Branches / Shops","Stock & Purchasing" to "Purchasing")))
+            root.addView(menuGroup("Analytics","📈", listOf("Reports (Sales/Profit/Stock)" to "Reports","Audit Log" to "Audit Log","Price Management" to "Price Management","System Settings" to "System Settings")))
+
+            scroll.addView(root)
+            setContentView(scroll)
+        } catch (e: Exception) {
+            val tv = TextView(this); tv.text = "Admin Error: ${e.message}"; setContentView(tv)
         }
+    }
+    private fun openSection(title:String){
+        try{
+            if(title.contains("Branch")){
+                startActivity(Intent(this, BranchesActivity::class.java)); return
+            }
+            val i = Intent(this, AdminDetailActivity::class.java)
+            val cleanTitle = when{
+                title.contains("Sales") -> "Sales Management"
+                title.contains("Customer") -> "Customers"
+                title.contains("Cash") -> "Cash Management"
+                title.contains("User") -> "Users & Permissions"
+                title.contains("Purchasing") || title.contains("Stock") -> "Purchasing"
+                title.contains("Report") -> "Reports"
+                title.contains("Audit") -> "Audit Log"
+                title.contains("Price") -> "Price Management"
+                title.contains("Setting") -> "System Settings"
+                else -> title
+            }
+            i.putExtra("TITLE", cleanTitle); startActivity(i)
+        } catch (e:Exception){ Toast.makeText(this,"Open $title: ${e.message}",1).show() }
     }
 }
