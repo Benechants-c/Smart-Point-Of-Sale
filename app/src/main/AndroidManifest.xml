@@ -21,6 +21,7 @@
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
         <activity android:name=".BranchesActivity" />
         <activity android:name=".StockTransferActivity" />
+        <activity android:name=".SalesActivity" android:exported="false" />
     </application>
 
 </manifest>
