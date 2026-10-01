@@ -1,108 +1,217 @@
 package com.smartpos
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
-import org.json.JSONObject
 
 class StockTransferActivity : Activity() {
-    data class Shop(val id: String, val name: String)
-    data class Prod(val key: String, val name: String, val code: String, var qty: Int)
-    private var shops: List<Shop> = emptyList()
-    private lateinit var fromSpin: Spinner
-    private lateinit var toSpin: Spinner
-    private lateinit var table: LinearLayout
-    private lateinit var qtyInput: EditText
-    private lateinit var prodNameView: TextView
-    private var selectedProd: Prod? = null
+
+    private lateinit var prefsShops: SharedPreferences
+    private lateinit var prefsProducts: SharedPreferences
+    private lateinit var prefsInventory: SharedPreferences
+    private lateinit var prefsTransferLog: SharedPreferences
+
+    private var fromShopId = ""
+    private var toShopId = ""
+    private var selectedProductKey = ""
+    private var selectedProductName = ""
+    private var selectedProductQty = 0f
+
+    private lateinit var txtSelected: TextView
+    private lateinit var txtLog: TextView
+    private lateinit var edtQty: EditText
+    private lateinit var spinnerFrom: Spinner
+    private lateinit var spinnerTo: Spinner
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        shops = getShops()
+        prefsShops = getSharedPreferences("shops_db", Context.MODE_PRIVATE)
+        prefsProducts = getSharedPreferences("products_db", Context.MODE_PRIVATE)
+        prefsInventory = getSharedPreferences("stock_db", Context.MODE_PRIVATE)
+        prefsTransferLog = getSharedPreferences("transfer_log", Context.MODE_PRIVATE)
+
         val root = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(10,10,10,10)}
-        val head = LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,10,12)}
-        head.addView(TextView(this).apply{text="STOCK TRANSFER - BUILD 128 REAL ONLY";setTextColor(Color.WHITE);textSize=13f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)})
-        head.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#475569"));setTextColor(Color.WHITE);setOnClickListener{finish()}})
-        root.addView(head)
+        val header = LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,16,12);gravity=Gravity.CENTER_VERTICAL}
+        header.addView(TextView(this).apply{text="STOCK TRANSFER - BUILD 132 REAL MERGE";setTextColor(Color.WHITE);textSize=12f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)})
+        header.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#475569"));setTextColor(Color.WHITE);setOnClickListener{finish()}})
+        root.addView(header)
 
-        if(shops.size < 2){
-            root.addView(TextView(this).apply{text="❌ Need at least 2 shops!\nCurrent: ${shops.size}\nGo to BRANCHES / SHOPS and add shops.\nExample: karoi_main and chikangwe";setPadding(20,20,20,20);setTextColor(Color.RED);textSize=14f;gravity=Gravity.CENTER})
-            setContentView(ScrollView(this).apply{addView(root)}); return
+        // SHOPS
+        val shops = mutableListOf<Pair<String,String>>()
+        prefsShops.all.forEach { (id, value) ->
+            try{
+                val parts = value.toString().split("|")
+                val name = if(parts.size>=2) "${parts[0]} - ${parts[1]}" else id
+                shops.add(Pair(id, name))
+            }catch(_:Exception){ shops.add(Pair(id,id)) }
         }
+        if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
 
-        fun label(t:String):TextView=TextView(this).apply{text=t;textSize=11f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE);setBackgroundColor(Color.parseColor("#1E293B"));setPadding(12,8,12,8)}
-        root.addView(label("FROM SHOP")); fromSpin = Spinner(this); root.addView(fromSpin)
-        root.addView(label("TO SHOP")); toSpin = Spinner(this); root.addView(toSpin)
-        val shopNames = shops.map{"${it.id} - ${it.name}"}
-        fromSpin.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shopNames)
-        toSpin.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shopNames)
-        toSpin.setSelection(1)
+        fun shopNames(): List<String> = shops.map{it.second}
+        fun shopIdFromName(name:String): String = shops.find{it.second==name}?.first?: "main"
 
-        root.addView(label("SELECT PRODUCT FROM FROM SHOP")); prodNameView = TextView(this).apply{text="No product selected";setPadding(12,12,12,12);setBackgroundColor(Color.parseColor("#F1F5F9"));setTextColor(Color.BLACK)}; root.addView(prodNameView)
-        root.addView(Button(this).apply{text="SELECT PRODUCT";setBackgroundColor(Color.parseColor("#2563EB"));setTextColor(Color.WHITE);setOnClickListener{selectProduct()}})
-        root.addView(label("QUANTITY TO TRANSFER *")); qtyInput = EditText(this).apply{hint="e.g. 5";inputType=android.text.InputType.TYPE_CLASS_NUMBER;setPadding(16,12,16,12);setBackgroundColor(Color.WHITE)}; root.addView(qtyInput)
-        root.addView(Button(this).apply{text="TRANSFER NOW";setBackgroundColor(Color.parseColor("#22C55E"));setTextColor(Color.WHITE);setOnClickListener{doTransfer()}})
-        root.addView(label("TRANSFER LOG")); table = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}; root.addView(table); refreshLog()
-        setContentView(ScrollView(this).apply{isFillViewport=true;addView(root)})
+        root.addView(TextView(this).apply{text="FROM SHOP";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        spinnerFrom = Spinner(this)
+        spinnerFrom.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shopNames())
+        root.addView(spinnerFrom)
+
+        root.addView(TextView(this).apply{text="TO SHOP";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        spinnerTo = Spinner(this)
+        spinnerTo.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shopNames())
+        root.addView(spinnerTo)
+
+        root.addView(TextView(this).apply{text="SELECT PRODUCT FROM FROM SHOP";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        txtSelected = TextView(this).apply{text="No product selected";setPadding(12,12,12,12);setBackgroundColor(Color.parseColor("#F1F5F9"))}
+        root.addView(txtSelected)
+
+        val btnSelect = Button(this).apply{
+            text="SELECT PRODUCT";setBackgroundColor(Color.parseColor("#2563EB"));setTextColor(Color.WHITE)
+            setOnClickListener{ showProductDialog() }
+        }
+        root.addView(btnSelect)
+
+        root.addView(TextView(this).apply{text="QUANTITY TO TRANSFER *";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        edtQty = EditText(this).apply{hint="e.g. 5";setPadding(12,12,12,12)}
+        root.addView(edtQty)
+
+        val btnTransfer = Button(this).apply{
+            text="TRANSFER NOW";setBackgroundColor(Color.parseColor("#22C55E"));setTextColor(Color.WHITE)
+            setOnClickListener{ doTransfer() }
+        }
+        root.addView(btnTransfer)
+
+        root.addView(TextView(this).apply{text="TRANSFER LOG";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        txtLog = TextView(this).apply{setPadding(12,12,12,12)}
+        root.addView(txtLog)
+
+        // Listeners to update shop ids
+        fromShopId = shopIdFromName(spinnerFrom.selectedItem.toString())
+        toShopId = shopIdFromName(spinnerTo.selectedItem.toString())
+
+        refreshLog()
+        setContentView(ScrollView(this).apply{addView(root)})
     }
 
-    private fun getShops(): List<Shop>{
-        val out = mutableListOf<Shop>()
-        try{
-            val prefs = getSharedPreferences("shops_db", Context.MODE_PRIVATE)
-            prefs.all.forEach{(k,v)-> try{ val j=JSONObject(v.toString()); out.add(Shop(j.optString("id",k), j.optString("name",k))) }catch(_:Exception){} }
-        }catch(_:Exception){}
-        return out
+    private fun getAllProducts(): List<Triple<String,String,Float>> {
+        val list = mutableListOf<Triple<String,String,Float>>()
+        // 1. FROM products_db — REAL — format: name|buy|sell|qty OR key is name
+        prefsProducts.all.forEach { (key,value) ->
+            try{
+                val str = value.toString()
+                val parts = str.split("|")
+                if(parts.size>=4){
+                    // parts: name|buy|sell|qty OR buy|sell|qty|name? handle both
+                    val qty = parts[3].toFloatOrNull()?: parts.last().toFloatOrNull()?: 0f
+                    val name = if(parts[0].length>2 && parts[0].any{it.isLetter()}) parts[0] else key
+                    list.add(Triple(key, name, qty))
+                } else if(parts.size==1){
+                    // maybe value is qty only?
+                    val qty = parts[0].toFloatOrNull()?: 0f
+                    list.add(Triple(key, key, qty))
+                } else {
+                    // fallback
+                    val qty = parts.last().toFloatOrNull()?: 0f
+                    list.add(Triple(key, key, qty))
+                }
+            }catch(_:Exception){
+                list.add(Triple(key, key, 0f))
+            }
+        }
+        // 2. FROM stock_db — if exists (RECEIVE STOCK may use this)
+        prefsInventory.all.forEach { (key,value) ->
+            try{
+                val str = value.toString()
+                val parts = str.split("|")
+                val qty = parts.last().toFloatOrNull()?: 0f
+                val name = parts.firstOrNull()?: key
+                if(list.none{it.second==name}) list.add(Triple(key, name, qty))
+            }catch(_:Exception){}
+        }
+        // 3. ALSO check any other pref files that look like inventory
+        listOf("inventory_db","stock","inventory").forEach { prefName ->
+            try{
+                val p = getSharedPreferences(prefName, Context.MODE_PRIVATE)
+                p.all.forEach { (key,value) ->
+                    try{
+                        val str = value.toString()
+                        val qty = str.split("|").last().toFloatOrNull()?: str.toFloatOrNull()?: 0f
+                        if(list.none{it.first==key}) list.add(Triple(key, key, qty))
+                    }catch(_:Exception){}
+                }
+            }catch(_:Exception){}
+        }
+        return list.filter{it.third>0 || true} // show all even if 0 for now
     }
 
-    private fun getProductsForShop(shopId: String): List<Prod>{
-        val list = mutableListOf<Prod>()
-        try{
-            val prefs = getSharedPreferences("products_db", 0)
-            prefs.all.forEach{(k,v)-> try{
-                val s=v.toString(); if(!s.trim().startsWith("{")) return@forEach
-                val j=JSONObject(s); val name=j.optString("name"); val code=j.optString("code"); val qty=j.optInt("qty",0)
-                // Show all products for now, qty check happens on transfer
-                if(name.isNotEmpty()) list.add(Prod(k,name,code,qty))
-            }catch(_:Exception){} }
-        }catch(_:Exception){}
-        return list
-    }
-
-    private fun selectProduct(){
-        val fromId = shops[fromSpin.selectedItemPosition].id
-        val prods = getProductsForShop(fromId)
-        if(prods.isEmpty()){Toast.makeText(this,"No products! Add via STOCK RECEIVE first",Toast.LENGTH_LONG).show(); return}
-        val names = prods.map{"${it.name} (${it.code}) Qty:${it.qty}"}.toTypedArray()
-        android.app.AlertDialog.Builder(this).setTitle("Select from $fromId").setItems(names){_,which-> selectedProd = prods[which]; prodNameView.text = "${selectedProd!!.name} | ${selectedProd!!.code} | Available: ${selectedProd!!.qty}" }.show()
+    private fun showProductDialog(){
+        val products = getAllProducts()
+        if(products.isEmpty()){
+            Toast.makeText(this,"No products found! First do RECEIVE STOCK",Toast.LENGTH_LONG).show()
+            return
+        }
+        val names = products.map{"${it.second} (Qty:${it.third})"}.toTypedArray()
+        AlertDialog.Builder(this)
+           .setTitle("Select Product - REAL MERGE (${products.size} found)")
+           .setItems(names){ _, which ->
+                val p = products[which]
+                selectedProductKey = p.first
+                selectedProductName = p.second
+                selectedProductQty = p.third
+                txtSelected.text = "${p.second} | Stock: ${p.third} | Key:${p.first}"
+            }.show()
     }
 
     private fun doTransfer(){
-        val p = selectedProd; if(p==null){Toast.makeText(this,"Select product first!",Toast.LENGTH_SHORT).show(); return}
-        val q = qtyInput.text.toString().toIntOrNull()?:0; if(q<=0){Toast.makeText(this,"Enter qty >0!",Toast.LENGTH_SHORT).show(); return}
-        if(q>p.qty){Toast.makeText(this,"Not enough stock! Only ${p.qty}",Toast.LENGTH_LONG).show(); return}
-        val fromId = shops[fromSpin.selectedItemPosition].id; val toId = shops[toSpin.selectedItemPosition].id
-        if(fromId==toId){Toast.makeText(this,"FROM and TO cannot be same!",Toast.LENGTH_SHORT).show(); return}
+        if(selectedProductKey.isEmpty()){ Toast.makeText(this,"Select product first",Toast.LENGTH_SHORT).show(); return }
+        val qtyStr = edtQty.text.toString()
+        val qty = qtyStr.toFloatOrNull()
+        if(qty==null || qty<=0){ Toast.makeText(this,"Enter valid qty",Toast.LENGTH_SHORT).show(); return }
+        if(qty > selectedProductQty && selectedProductQty>0){ Toast.makeText(this,"Not enough stock! Have ${selectedProductQty}",Toast.LENGTH_LONG).show(); return }
+
+        val fromName = spinnerFrom.selectedItem.toString()
+        val toName = spinnerTo.selectedItem.toString()
+        if(fromName==toName){ Toast.makeText(this,"FROM and TO cannot be same",Toast.LENGTH_SHORT).show(); return }
+
+        // Update products_db qty
         try{
-            val prefs = getSharedPreferences("products_db",0)
-            val fromJson = prefs.getString(p.key,"{}")?.let{JSONObject(it)}?: JSONObject()
-            fromJson.put("qty", fromJson.optInt("qty",p.qty) - q)
-            prefs.edit().putString(p.key, fromJson.toString()).apply()
+            val cur = prefsProducts.getString(selectedProductKey,"")
+            if(cur!=null && cur.contains("|")){
+                val parts = cur.split("|").toMutableList()
+                if(parts.size>=4){
+                    val oldQty = parts[3].toFloatOrNull()?: 0f
+                    parts[3] = (oldQty - qty).toString()
+                    prefsProducts.edit().putString(selectedProductKey, parts.joinToString("|")).apply()
+                }
+            }
             // Log
-            getSharedPreferences("transfer_log",0).edit().putString(System.currentTimeMillis().toString(), "$fromId -> $toId | ${p.name} x$q | ${java.text.SimpleDateFormat("dd/MM HH:mm").format(java.util.Date())}").apply()
-            Toast.makeText(this,"✅ Transferred $q x ${p.name} from $fromId to $toId!",Toast.LENGTH_LONG).show()
-            qtyInput.setText(""); selectedProd=null; prodNameView.text="No product selected"; refreshLog()
-        }catch(e:Exception){Toast.makeText(this,"Error: ${e.message}",Toast.LENGTH_LONG).show()}
+            val logEntry = "${java.text.SimpleDateFormat("dd/MM HH:mm").format(java.util.Date())} | $qty x $selectedProductName FROM $fromName TO $toName"
+            val oldLog = prefsTransferLog.getString("logs","")?: ""
+            prefsTransferLog.edit().putString("logs", oldLog + "\n" + logEntry).apply()
+
+            // Also save to audit
+            val audit = getSharedPreferences("audit", Context.MODE_PRIVATE)
+            val logs = audit.getStringSet("logs", mutableSetOf())?.toMutableSet()?: mutableSetOf()
+            logs.add(logEntry)
+            audit.edit().putStringSet("logs", logs).apply()
+
+            Toast.makeText(this,"TRANSFERRED $qty x $selectedProductName SUCCESS",Toast.LENGTH_LONG).show()
+            refreshLog()
+            txtSelected.text="No product selected"
+            selectedProductKey=""
+            edtQty.setText("")
+        }catch(e:Exception){
+            Toast.makeText(this,"Transfer error: ${e.message}",Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun refreshLog(){
-        table.removeAllViews()
-        val logs = getSharedPreferences("transfer_log",0).all.values.map{it.toString()}.reversed()
-        if(logs.isEmpty()) table.addView(TextView(this).apply{text="No transfers yet";gravity=Gravity.CENTER;setPadding(0,20,0,20);setTextColor(Color.GRAY)})
-        else logs.take(20).forEach{ l-> table.addView(TextView(this).apply{text=l;setPadding(10,8,10,8);setBackgroundColor(Color.WHITE);setTextColor(Color.BLACK)}) }
+        val logs = prefsTransferLog.getString("logs","")?: ""
+        txtLog.text = if(logs.isBlank()) "No transfers yet" else logs.trim()
     }
 }
