@@ -1,12 +1,14 @@
 package com.smartpos
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
 import android.widget.*
 
@@ -19,8 +21,6 @@ class SalesActivity : Activity() {
     private val cart = mutableListOf<CartItem>()
     private lateinit var spinnerShop: Spinner
     private lateinit var spinnerDept: Spinner
-    private lateinit var searchInput: EditText
-    private lateinit var productsLayout: LinearLayout
     private lateinit var cartLayout: LinearLayout
     private lateinit var totalView: TextView
     private lateinit var receiptView: TextView
@@ -34,147 +34,159 @@ class SalesActivity : Activity() {
     private fun getTotal(): Double { var t=0.0; for(c in cart) t+=c.product.sell*c.qty; return t }
     private fun calcChange(){
         val total=getTotal(); val tendered=tenderedInput.text.toString().toDoubleOrNull()?:0.0; val change=tendered-total
-        if(tendered==0.0){ changeView.text="CHANGE: $0.00"; changeView.setTextColor(Color.parseColor("#16A34A")) }
-        else if(change<0){ changeView.text="NEED $${String.format("%.2f",-change)} MORE"; changeView.setTextColor(Color.RED) }
-        else { changeView.text="CHANGE: $${String.format("%.2f",change)}"; changeView.setTextColor(Color.parseColor("#16A34A")) }
+        if(tendered==0.0) changeView.text="CHANGE: $0.00"
+        else if(change<0) changeView.text="NEED $${String.format("%.2f",-change)}"
+        else changeView.text="CHANGE: $${String.format("%.2f",change)}"
     }
 
     private fun loadRealStock(){
         allProducts.clear()
         try{
-            val shopId=getShopId(); val stockPref=getSharedPreferences("stock_$shopId", Context.MODE_PRIVATE)
-            for((code,v) in stockPref.all){
+            val shopId=getShopId(); val pref=getSharedPreferences("stock_$shopId", Context.MODE_PRIVATE)
+            for((code,v) in pref.all){
                 try{
-                    val parts=v.toString().split("|")
-                    if(parts.size>=4){ val name=parts[0]; val sell=parts[2].toDoubleOrNull()?:0.0; val qty=parts[3].toIntOrNull()?:0; val dept=if(parts.size>5) parts[5] else "General"; if(qty>0) allProducts.add(Product(code,name,sell,qty,shopId,dept)) }
+                    val p=v.toString().split("|")
+                    if(p.size>=4){ val name=p[0]; val sell=p[2].toDoubleOrNull()?:0.0; val qty=p[3].toIntOrNull()?:0; val dept=if(p.size>5)p[5] else "General"; if(qty>0) allProducts.add(Product(code,name,sell,qty,shopId,dept)) }
                 }catch(_:Exception){}
             }
         }catch(_:Exception){}
         depts.clear(); depts.add("ALL DEPARTMENTS"); for(d in allProducts.map{it.dept.ifEmpty{"General"}}.distinct()) depts.add(d)
-        spinnerDept.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,depts); applyFilter()
+        spinnerDept.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,depts); refreshCart()
     }
-    private fun applyFilter(){
-        filtered.clear(); val q=searchInput.text.toString().trim().lowercase(); val deptSel=if(spinnerDept.selectedItemPosition in depts.indices) depts[spinnerDept.selectedItemPosition] else "ALL DEPARTMENTS"
-        for(p in allProducts){ val ms=q.isEmpty()||p.name.lowercase().contains(q)||p.code.lowercase().contains(q); val md=deptSel=="ALL DEPARTMENTS"||p.dept==deptSel; if(ms&&md) filtered.add(p) }
-        refreshProducts()
-    }
-    private fun refreshProducts(){
-        productsLayout.removeAllViews()
-        if(filtered.isEmpty()){ productsLayout.addView(TextView(this).apply{text="No stock in ${getShopName()}"; setPadding(20,40,20,40); setTextColor(Color.GRAY); textSize=14f}); return }
-        for(p in filtered){
-            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(2,2,2,2); setBackgroundColor(Color.parseColor("#E5E7EB"))}
-            val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(14,14,14,14); setBackgroundColor(Color.WHITE)}
-            val info=TextView(this).apply{
-                text="${p.name}\n${p.code} | Stock:${p.qty} | $${p.sell}"; textSize=13f; setTextColor(Color.parseColor("#111827"))
-                layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(0,0,12,0)}
+
+    private fun showSearchDialog(){
+        val dlg=Dialog(this)
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
+        root.addView(TextView(this).apply{text="Search Product"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+
+        val searchRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(8,8,8,8)}
+        val ed=EditText(this).apply{hint="Enter product name or code..."; layoutParams=LinearLayout.LayoutParams(0,-2,1f); setPadding(20,14,20,14); setBackgroundColor(Color.parseColor("#F1F5F9"))}
+        searchRow.addView(ed); root.addView(searchRow)
+
+        val listLay=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        val scroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(listLay)}
+        root.addView(scroll)
+
+        fun refreshList(q:String){
+            listLay.removeAllViews(); filtered.clear()
+            val qq=q.trim().lowercase()
+            val selDept=if(spinnerDept.selectedItemPosition in depts.indices) depts[spinnerDept.selectedItemPosition] else "ALL DEPARTMENTS"
+            for(p in allProducts){ if((qq.isEmpty()||p.name.lowercase().contains(qq)||p.code.lowercase().contains(qq)) && (selDept=="ALL DEPARTMENTS"||p.dept==selDept)) filtered.add(p) }
+            for(p in filtered){
+                val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(14,12,14,12); setBackgroundColor(Color.WHITE)}
+                val left=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
+                left.addView(TextView(this).apply{text=p.name; textSize=14f; setTypeface(null,Typeface.BOLD)})
+                left.addView(TextView(this).apply{text=p.code; textSize=11f; setTextColor(Color.GRAY)})
+                val price=TextView(this).apply{text="$${p.sell}"; textSize=14f; setTypeface(null,Typeface.BOLD); gravity=Gravity.END}
+                row.addView(left); row.addView(price)
+                row.setOnClickListener{ addToCart(p); dlg.dismiss() }
+                listLay.addView(row)
+                listLay.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB"))})
             }
-            val btn=Button(this).apply{
-                text="ADD"; textSize=12f; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
-                layoutParams=LinearLayout.LayoutParams(180,-2)
-            }
-            btn.setOnClickListener{addToCart(p)}
-            row.addView(info); row.addView(btn); card.addView(row)
-            productsLayout.addView(card)
-            productsLayout.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,8)})
         }
+        ed.addTextChangedListener(object:TextWatcher{override fun afterTextChanged(s:Editable?){refreshList(s.toString())} override fun beforeTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){} override fun onTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){}})
+        refreshList("")
+
+        val close=Button(this).apply{text="CLOSE"; setBackgroundColor(Color.parseColor("#E5E7EB"))}
+        close.setOnClickListener{dlg.dismiss()}; root.addView(close)
+
+        dlg.setContentView(root); dlg.show(); val w=(resources.displayMetrics.widthPixels*0.92).toInt(); dlg.window?.setLayout(w,-2)
     }
+
     private fun addToCart(p: Product){
-        val exist=cart.find{it.product.code==p.code}
-        if(exist!=null){ if(exist.qty<p.qty) exist.qty++ else Toast.makeText(this,"No more stock",Toast.LENGTH_SHORT).show() } else cart.add(CartItem(p,1))
+        val ex=cart.find{it.product.code==p.code}
+        if(ex!=null){ if(ex.qty<p.qty) ex.qty++ else Toast.makeText(this,"No more stock",0).show() } else cart.add(CartItem(p,1))
         refreshCart()
     }
 
     private fun refreshCart(){
-        cartLayout.removeAllViews(); var total=0.0; var tq=0; var receiptTxt=""
-        if(cart.isEmpty()){
-            cartLayout.addView(TextView(this).apply{text="Cart empty"; setPadding(20,20,20,20); setTextColor(Color.GRAY)})
-        }
+        cartLayout.removeAllViews()
+        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(10,10,10,10); setBackgroundColor(Color.parseColor("#E2E0F0"))}
+        fun h(t:String,w:Float)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#475569")); layoutParams=LinearLayout.LayoutParams(0,-2,w); gravity=Gravity.CENTER_VERTICAL}
+        header.addView(TextView(this).apply{text="#"; layoutParams=LinearLayout.LayoutParams(60,-2); setTypeface(null,Typeface.BOLD); textSize=11f})
+        header.addView(h("ITEM",2f)); header.addView(h("QTY",0.7f)); header.addView(h("PRICE",1f)); header.addView(h("TOTAL",1f))
+        cartLayout.addView(header)
+
+        var idx=1; var total=0.0
         for(item in cart){
-            val line=item.product.sell*item.qty; total+=line; tq+=item.qty
-            receiptTxt+="${item.product.name} x${item.qty} = $${String.format("%.2f",line)}\n"
-            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(1,1,1,1); setBackgroundColor(Color.parseColor("#E5E7EB"))}
-            val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(10,10,10,10); setBackgroundColor(Color.WHITE); gravity=android.view.Gravity.CENTER_VERTICAL}
-            val nameTv=TextView(this).apply{
-                text="${item.product.name}\n$${item.product.sell} x${item.qty} = $${String.format("%.2f",line)}"
-                textSize=12f; setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f)
-            }
-            val minus=Button(this).apply{text="-"; setBackgroundColor(Color.parseColor("#EF4444")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(120,-2)}
-            val qtyTv=TextView(this).apply{text="${item.qty}"; setPadding(16,8,16,8); setTypeface(null,Typeface.BOLD); textSize=14f; gravity=android.view.Gravity.CENTER}
-            val plus=Button(this).apply{text="+"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(120,-2)}
-            minus.setOnClickListener{ if(item.qty>1){item.qty--; refreshCart()} else {cart.remove(item); refreshCart()} }
-            plus.setOnClickListener{ if(item.qty<item.product.qty){item.qty++; refreshCart()} else Toast.makeText(this,"Max ${item.product.qty}",Toast.LENGTH_SHORT).show() }
-            r.addView(nameTv); r.addView(minus); r.addView(qtyTv); r.addView(plus); card.addView(r)
-            cartLayout.addView(card)
-            cartLayout.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,6)})
+            val line=item.product.sell*item.qty; total+=line
+            val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(10,16,10,16); setBackgroundColor(Color.WHITE); gravity=Gravity.CENTER_VERTICAL}
+            row.addView(TextView(this).apply{text="$idx."; layoutParams=LinearLayout.LayoutParams(60,-2); textSize=12f})
+            row.addView(TextView(this).apply{text=item.product.name; layoutParams=LinearLayout.LayoutParams(0,-2,2f); textSize=13f})
+            val qtyLay=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; layoutParams=LinearLayout.LayoutParams(0,-2,0.7f); gravity=Gravity.CENTER_VERTICAL}
+            val minus=TextView(this).apply{text="-"; setPadding(8,4,8,4); setBackgroundColor(Color.parseColor("#EF4444")); setTextColor(Color.WHITE); gravity=Gravity.CENTER; textSize=12f}
+            val qty=TextView(this).apply{text="${item.qty}"; setPadding(8,4,8,4); gravity=Gravity.CENTER; setTypeface(null,Typeface.BOLD); textSize=12f}
+            val plus=TextView(this).apply{text="+"; setPadding(8,4,8,4); setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); gravity=Gravity.CENTER; textSize=12f}
+            minus.setOnClickListener{if(item.qty>1){item.qty--; refreshCart()} else {cart.remove(item); refreshCart()}}
+            plus.setOnClickListener{if(item.qty<item.product.qty){item.qty++; refreshCart()}}
+            qtyLay.addView(minus); qtyLay.addView(qty); qtyLay.addView(plus)
+            row.addView(qtyLay)
+            row.addView(TextView(this).apply{text="$${item.product.sell}"; layoutParams=LinearLayout.LayoutParams(0,-2,1f); gravity=Gravity.CENTER; textSize=12f})
+            row.addView(TextView(this).apply{text="$${String.format("%.2f",line)}"; layoutParams=LinearLayout.LayoutParams(0,-2,1f); gravity=Gravity.END; setTypeface(null,Typeface.BOLD); textSize=12f})
+            cartLayout.addView(row)
+            cartLayout.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB"))})
+            idx++
         }
-        if(cart.isEmpty()) receiptView.text="RECEIPT: No items"
-        else receiptView.text=receiptTxt+"----\nTOTAL: $${String.format("%.2f",total)} | ITEMS: $tq"
-        totalView.text="TOTAL: $${String.format("%.2f",total)} | $tq items | ${getShopName()}"; calcChange()
+        receiptView.text="RECEIPT: ${cart.size} items"
+        totalView.text="PRODUCT TOTAL: $${String.format("%.2f",total)}"
+        calcChange()
     }
 
     private fun completeSale(){
-        if(cart.isEmpty()){Toast.makeText(this,"Cart empty",Toast.LENGTH_SHORT).show(); return}
+        if(cart.isEmpty()){Toast.makeText(this,"Cart empty",0).show(); return}
         val total=getTotal(); val tendered=tenderedInput.text.toString().toDoubleOrNull()?:0.0
-        if(tendered<total){Toast.makeText(this,"Tendered less than TOTAL",Toast.LENGTH_LONG).show(); return}
-        val change=tendered-total
+        if(tendered<total){Toast.makeText(this,"Tendered less than TOTAL",1).show(); return}
         try{
             val shopId=getShopId()
             for(item in cart){
-                val stockPref=getSharedPreferences("stock_$shopId",Context.MODE_PRIVATE)
-                val old=stockPref.getString(item.product.code,"")?:""
+                val pref=getSharedPreferences("stock_$shopId",Context.MODE_PRIVATE)
+                val old=pref.getString(item.product.code,"")?:""
                 if(old.contains("|")){
-                    val parts=old.split("|").toMutableList(); val oldQty=parts.getOrNull(3)?.toIntOrNull()?:0; parts[3]=(oldQty-item.qty).toString()
-                    stockPref.edit().putString(item.product.code,parts.joinToString("|")).apply()
+                    val parts=old.split("|").toMutableList(); val oq=parts.getOrNull(3)?.toIntOrNull()?:0; parts[3]=(oq-item.qty).toString()
+                    pref.edit().putString(item.product.code,parts.joinToString("|")).apply()
                 }
             }
         }catch(_:Exception){}
-        Toast.makeText(this,"SALE COMPLETE Change $${String.format("%.2f",change)}",Toast.LENGTH_LONG).show()
+        Toast.makeText(this,"SALE OK $${String.format("%.2f",total)}",1).show()
         cart.clear(); tenderedInput.setText(""); refreshCart(); loadRealStock()
     }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        try{ val ps=getSharedPreferences("shops_db",Context.MODE_PRIVATE); for((k,v) in ps.all){ shops.add(Pair(k,k)) } }catch(_:Exception){}
+        try{ val ps=getSharedPreferences("shops_db",Context.MODE_PRIVATE); for((k,v) in ps.all) shops.add(Pair(k,k)) }catch(_:Exception){}
         if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(12,12,12,12); setBackgroundColor(Color.parseColor("#F8FAFC"))}
-        root.addView(TextView(this).apply{text="POS SALES - BUILD 159 PRETTY"; textSize=16f; setTypeface(null,Typeface.BOLD); setPadding(0,0,0,8)})
 
-        fun label(t:String)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12,8,12,8)}
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(8,8,8,8); setBackgroundColor(Color.parseColor("#F1F5F9"))}
+        root.addView(TextView(this).apply{text="POS SALES"; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
+
+        fun label(t:String)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12,6,12,6)}
 
         root.addView(label("SELECT SHOP"))
         spinnerShop=Spinner(this).apply{setBackgroundColor(Color.WHITE)}; spinnerShop.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,shops.map{it.second}); root.addView(spinnerShop)
-        root.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,8)})
-
         root.addView(label("DEPARTMENT"))
         spinnerDept=Spinner(this).apply{setBackgroundColor(Color.WHITE)}; depts.add("ALL DEPARTMENTS"); spinnerDept.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,depts); root.addView(spinnerDept)
-        root.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,8)})
 
-        searchInput=EditText(this).apply{hint="Search product"; setPadding(18,14,18,14); setBackgroundColor(Color.WHITE); textSize=14f}; root.addView(searchInput)
-        root.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,8)})
+        val searchBtn=Button(this).apply{text="🔍 Search"; setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(300,-2).apply{setMargins(8,8,8,8)}}
+        searchBtn.setOnClickListener{showSearchDialog()}; root.addView(searchBtn)
 
-        root.addView(label("PRODUCTS"))
-        productsLayout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};
-        val prodScroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(productsLayout); setBackgroundColor(Color.WHITE)}; root.addView(prodScroll)
-
-        root.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,12)})
         root.addView(label("CART - Use - / + to change qty"))
-        cartLayout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#F1F5F9"))};
-        val cartScroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,0.7f); addView(cartLayout); setBackgroundColor(Color.parseColor("#F1F5F9"))}; root.addView(cartScroll)
+        cartLayout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)}
+        val scroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(cartLayout)}; root.addView(scroll)
 
-        receiptView=TextView(this).apply{text="RECEIPT: No items"; setBackgroundColor(Color.parseColor("#E2E8F0")); setPadding(14,12,14,12); setTypeface(null,Typeface.BOLD); textSize=12f; setTextColor(Color.parseColor("#0F172A"))}; root.addView(receiptView)
-        totalView=TextView(this).apply{text="TOTAL: $0.00"; setBackgroundColor(Color.parseColor("#DBEAFE")); setPadding(14,12,14,12); setTypeface(null,Typeface.BOLD); textSize=14f}; root.addView(totalView)
+        val receiptRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(12,10,12,10); setBackgroundColor(Color.parseColor("#E2E8F0"))}
+        receiptView=TextView(this).apply{text="RECEIPT: 0 items"; setTypeface(null,Typeface.BOLD); textSize=12f; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
+        totalView=TextView(this).apply{text="PRODUCT TOTAL: $0.00"; setTypeface(null,Typeface.BOLD); textSize=14f; gravity=Gravity.END; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
+        receiptRow.addView(receiptView); receiptRow.addView(totalView); root.addView(receiptRow)
 
-        val tenderRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(0,8,0,0); gravity=android.view.Gravity.CENTER_VERTICAL}
-        tenderRow.addView(TextView(this).apply{text="TENDERED $: "; setTypeface(null,Typeface.BOLD); textSize=13f})
-        tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(0,-2,1f); setBackgroundColor(Color.WHITE); setPadding(14,10,14,10)}; tenderRow.addView(tenderedInput); root.addView(tenderRow)
+        val tenderRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(8,6,8,6); setBackgroundColor(Color.WHITE)}
+        tenderRow.addView(TextView(this).apply{text="TENDERED $:"; setTypeface(null,Typeface.BOLD); textSize=12f})
+        tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(-1,-2,1f).apply{setMargins(8,0,0,0)}; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,8,12,8)}; tenderRow.addView(tenderedInput); root.addView(tenderRow)
 
-        changeView=TextView(this).apply{text="CHANGE: $0.00"; setBackgroundColor(Color.parseColor("#FEF3C7")); setPadding(14,12,14,12); setTypeface(null,Typeface.BOLD); textSize=15f; setTextColor(Color.parseColor("#16A34A"))}; root.addView(changeView)
-        root.addView(Button(this).apply{text="COMPLETE SALE + PRINT"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); setOnClickListener{completeSale()}})
+        changeView=TextView(this).apply{text="CHANGE: $0.00"; setBackgroundColor(Color.parseColor("#FEF3C7")); setPadding(12,10,12,10); setTypeface(null,Typeface.BOLD); textSize=14f; setTextColor(Color.parseColor("#16A34A"))}; root.addView(changeView)
+        root.addView(Button(this).apply{text="COMPLETE SALE + PRINT"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,14,0,14); setOnClickListener{completeSale()}})
 
-        spinnerShop.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a: AdapterView<*>?,v: View?,p:Int,id:Long){loadRealStock()} override fun onNothingSelected(a: AdapterView<*>?){}}
-        spinnerDept.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a: AdapterView<*>?,v: View?,p:Int,id:Long){applyFilter()} override fun onNothingSelected(a: AdapterView<*>?){}}
-        searchInput.addTextChangedListener(object: TextWatcher{override fun afterTextChanged(s: Editable?){applyFilter()} override fun beforeTextChanged(s: CharSequence?,st:Int,c:Int,a:Int){} override fun onTextChanged(s: CharSequence?,st:Int,b:Int,c:Int){}})
-        tenderedInput.addTextChangedListener(object: TextWatcher{override fun afterTextChanged(s: Editable?){calcChange()} override fun beforeTextChanged(s: CharSequence?,st:Int,c:Int,a:Int){} override fun onTextChanged(s: CharSequence?,st:Int,b:Int,c:Int){}})
+        spinnerShop.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){loadRealStock()} override fun onNothingSelected(a:AdapterView<*>?){}}
+        spinnerDept.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){loadRealStock()} override fun onNothingSelected(a:AdapterView<*>?){}}
         setContentView(root); loadRealStock()
     }
 }
