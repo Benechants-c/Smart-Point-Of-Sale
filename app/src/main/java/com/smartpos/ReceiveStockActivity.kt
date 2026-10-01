@@ -1,146 +1,146 @@
 package com.smartpos
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
-import android.text.InputType
+import android.view.Gravity
 import android.widget.*
 
 class ReceiveStockActivity : Activity() {
-    data class Line(var name: String, var code: String, var cost: Double, var sell: Double, var qty: Int)
-    data class Prod(val name: String, val code: String, val cost: Double, val price: Double)
 
-    private val list = mutableListOf<Line>()
-    private lateinit var totalView: TextView
-    private lateinit var table: LinearLayout
-
-    private fun label(t: String): TextView = TextView(this).apply {
-        text = t; textSize = 11f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE)
-        setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12, 6, 12, 6)
-    }
-
-    private fun getAllProducts(): List<Prod> {
-        val out = mutableListOf<Prod>()
-        try {
-            val db = openOrCreateDatabase("products_db", Context.MODE_PRIVATE, null)
-            db.execSQL("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, code TEXT, cost REAL, price REAL, qty INTEGER)")
-            val c = db.rawQuery("SELECT name, code, cost, price FROM products GROUP BY code", null)
-            while (c.moveToNext()) {
-                val n = c.getString(0); val co = c.getString(1)
-                if (n!= null && co!= null && n.isNotEmpty() && co.isNotEmpty()) {
-                    out.add(Prod(n, co, c.getDouble(2), c.getDouble(3)))
-                }
-            }
-            c.close(); db.close()
-        } catch (e: Exception) {}
-        return out.distinctBy { it.code } // REAL only, no duplicates
-    }
-
-    private fun refresh() {
-        table.removeAllViews()
-        for (l in list) { table.addView(TextView(this).apply { text = l.name + " | " + l.code + " | " + l.cost + " | " + l.sell + " | " + l.qty; setPadding(12,14,12,14) }) }
-        var tq = 0; var tc = 0.0; for (l in list) { tq += l.qty; tc += l.cost * l.qty }
-        totalView.text = "Total: " + list.size + " UNIQUE | Qty: " + tq + " | Cost: $" + String.format("%.1f", tc)
-    }
-
-    private fun printGrn() {
-        if (list.isEmpty()) { Toast.makeText(this, "Nothing", Toast.LENGTH_SHORT).show(); return }
-        var txt = "GRN\n"; for (l in list) { txt += l.name + " | " + l.code + " | " + l.qty + "\n" }
-        val i = android.content.Intent(android.content.Intent.ACTION_SEND); i.type = "text/plain"; i.putExtra(android.content.Intent.EXTRA_TEXT, txt)
-        startActivity(android.content.Intent.createChooser(i, "PRINT GRN"))
-    }
-
-    private fun completeReceive() {
-        if (list.isEmpty()) { return }
-        try {
-            val db = openOrCreateDatabase("products_db", Context.MODE_PRIVATE, null)
-            db.execSQL("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, code TEXT, cost REAL, price REAL, qty INTEGER)")
-            for (l in list) { db.execSQL("INSERT INTO products(name,code,cost,price,qty) VALUES('" + l.name.replace("'","") + "','" + l.code + "'," + l.cost + "," + l.sell + "," + l.qty + ")") }
-            db.close()
-        } catch (e: Exception) {}
-        Toast.makeText(this, "RECEIVE COMPLETE", Toast.LENGTH_LONG).show(); list.clear(); refresh()
-    }
+    private lateinit var prefsShops: SharedPreferences
+    private lateinit var prefsProducts: SharedPreferences
+    private lateinit var prefsInventory: SharedPreferences
+    private lateinit var spinnerShop: Spinner
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE) }
-        root.addView(TextView(this).apply { text = "RECEIVE STOCK - BUILD 122 NO DUPLICATES"; textSize = 18f; setTypeface(null, Typeface.BOLD); setPadding(0,0,0,20) })
-        root.addView(TextView(this).apply { text = "Product | Code | Cost | Sell | Qty"; setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(20,12,20,12) })
-        table = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; root.addView(table)
-        root.addView(Button(this).apply { text = "ADD PRODUCT"; setOnClickListener { showAddDialog() } })
-        totalView = TextView(this).apply { text = "Total: 0"; setBackgroundColor(Color.parseColor("#DBEAFE")); setPadding(20,12,20,12) }; root.addView(totalView)
-        val bottom = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        bottom.addView(Button(this).apply { text = "PRINT GRN"; layoutParams = LinearLayout.LayoutParams(0,-2,1f); setOnClickListener { printGrn() } })
-        bottom.addView(Button(this).apply { text = "COMPLETE RECEIVE"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE); layoutParams = LinearLayout.LayoutParams(0,-2,1f); setOnClickListener { completeReceive() } })
-        root.addView(bottom)
-        refresh()
-        setContentView(ScrollView(this).apply { addView(root) })
-    }
+        prefsShops = getSharedPreferences("shops_db", Context.MODE_PRIVATE)
+        prefsProducts = getSharedPreferences("products_db", Context.MODE_PRIVATE)
+        prefsInventory = getSharedPreferences("inventory_db", Context.MODE_PRIVATE)
 
-    private fun showAddDialog() {
-        val all = getAllProducts()
-        val nameList = all.map { it.name }.distinct()
-        val codeList = all.map { it.code }.distinct()
-        val byName = all.associateBy { it.name }
-        val byCode = all.associateBy { it.code }
+        val root = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(12,12,12,12)}
+        val header = LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,16,12);gravity=Gravity.CENTER_VERTICAL}
+        header.addView(TextView(this).apply{text="RECEIVE STOCK - BUILD 133 SHOP PICKER REAL";setTextColor(Color.WHITE);textSize=12f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)})
+        header.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#475569"));setTextColor(Color.WHITE);setOnClickListener{finish()}})
+        root.addView(header)
 
-        val dlg = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24,20,24,20) }
-
-        val nameInput = AutoCompleteTextView(this).apply {
-            hint = "Search REAL product name"; setPadding(20,14,20,14); threshold = 1
-            setAdapter(ArrayAdapter(this@ReceiveStockActivity, android.R.layout.simple_dropdown_item_1line, nameList))
+        // LOAD SHOPS — REAL FROM shops_db
+        val shops = mutableListOf<Pair<String,String>>()
+        prefsShops.all.forEach { (id, v) ->
+            try{
+                val parts = v.toString().split("|")
+                val name = if(parts.size>=1) "${parts[0]} - ${if(parts.size>1) parts[1] else ""}" else id
+                shops.add(Pair(id, name))
+            }catch(_:Exception){ shops.add(Pair(id,id)) }
         }
-        val codeInput = AutoCompleteTextView(this).apply {
-            hint = "Search REAL code"; setPadding(20,14,20,14); threshold = 1
-            setAdapter(ArrayAdapter(this@ReceiveStockActivity, android.R.layout.simple_dropdown_item_1line, codeList))
-        }
-        val costInput = EditText(this).apply { hint = "Cost *"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(20,14,20,14) }
-        val sellInput = EditText(this).apply { hint = "Sell *"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(20,14,20,14) }
-        val qtyInput = EditText(this).apply { hint = "Qty *"; inputType = InputType.TYPE_CLASS_NUMBER; setPadding(20,14,20,14) }
-        val err = TextView(this).apply { setTextColor(Color.RED) }
+        if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
 
-        nameInput.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
-            val sel = nameInput.adapter.getItem(pos).toString()
-            val p = byName[sel]
-            if (p!= null) { codeInput.setText(p.code); costInput.setText(p.cost.toString()); sellInput.setText(p.price.toString()) }
-        }
-        codeInput.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
-            val sel = codeInput.adapter.getItem(pos).toString()
-            val p = byCode[sel]
-            if (p!= null) { nameInput.setText(p.name); costInput.setText(p.cost.toString()); sellInput.setText(p.price.toString()) }
-        }
+        root.addView(TextView(this).apply{text="SELECT SHOP TO RECEIVE *";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        spinnerShop = Spinner(this)
+        spinnerShop.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shops.map{it.second})
+        root.addView(spinnerShop)
 
-        dlg.addView(label("Product Name * (REAL)")); dlg.addView(nameInput)
-        dlg.addView(label("Code * (REAL - Your saved code)")); dlg.addView(codeInput)
-        dlg.addView(label("Cost *")); dlg.addView(costInput)
-        dlg.addView(label("Selling *")); dlg.addView(sellInput)
-        dlg.addView(label("Quantity *")); dlg.addView(qtyInput)
-        dlg.addView(err)
+        root.addView(TextView(this).apply{text="PRODUCT NAME *";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        val edtName = EditText(this).apply{hint="e.g. Bread, Sugar";setPadding(12,12,12,12)}
+        root.addView(edtName)
 
-        val d = AlertDialog.Builder(this).setTitle("Add Product - BUILD 122 - NO DUPLICATES").setView(dlg).setPositiveButton("ADD", null).setNegativeButton("CANCEL", null).create()
-        d.show()
-        d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val n = nameInput.text.toString().trim(); val c = codeInput.text.toString().trim()
-            val coS = costInput.text.toString().trim(); val seS = sellInput.text.toString().trim(); val qS = qtyInput.text.toString().trim()
-            if (n.isEmpty() || c.isEmpty() || coS.isEmpty() || seS.isEmpty() || qS.isEmpty()) { err.text = "All fields required"; return@setOnClickListener }
+        root.addView(TextView(this).apply{text="BUY PRICE";setBackgroundColor(Color.parseColor("#334155"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=10f})
+        val edtBuy = EditText(this).apply{hint="e.g. 1.50";inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;setPadding(12,12,12,12)}
+        root.addView(edtBuy)
 
-            // CHECK DUPLICATE - MERGE INSTEAD OF DUPLICATE
-            val existing = list.find { it.code.equals(c, true) }
-            if (existing!= null) {
-                existing.qty += qS.toInt()
-                existing.name = n
-                existing.cost = coS.toDouble()
-                existing.sell = seS.toDouble()
-                refresh()
-                Toast.makeText(this, "Updated " + n + " qty to " + existing.qty, Toast.LENGTH_SHORT).show()
-                d.dismiss()
-            } else {
-                list.add(Line(n,c,coS.toDouble(),seS.toDouble(),qS.toInt()))
-                refresh(); d.dismiss()
+        root.addView(TextView(this).apply{text="SELL PRICE";setBackgroundColor(Color.parseColor("#334155"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=10f})
+        val edtSell = EditText(this).apply{hint="e.g. 2.00";inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;setPadding(12,12,12,12)}
+        root.addView(edtSell)
+
+        root.addView(TextView(this).apply{text="QUANTITY *";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=11f;setTypeface(null,Typeface.BOLD)})
+        val edtQty = EditText(this).apply{hint="e.g. 50";inputType=android.text.InputType.TYPE_CLASS_NUMBER;setPadding(12,12,12,12)}
+        root.addView(edtQty)
+
+        root.addView(TextView(this).apply{text="SUPPLIER (optional)";setBackgroundColor(Color.parseColor("#334155"));setTextColor(Color.WHITE);setPadding(8,6,8,6);textSize=10f})
+        val edtSupplier = EditText(this).apply{hint="e.g. Chiedza Supplier";setPadding(12,12,12,12)}
+        root.addView(edtSupplier)
+
+        val txtInfo = TextView(this).apply{text="Ready to receive";setPadding(12,12,12,12);setTextColor(Color.parseColor("#64748B"));textSize=11f}
+        root.addView(txtInfo)
+
+        val btnReceive = Button(this).apply{
+            text="RECEIVE STOCK NOW";setBackgroundColor(Color.parseColor("#22C55E"));setTextColor(Color.WHITE);textSize=14f
+            setOnClickListener{
+                val shopPos = spinnerShop.selectedItemPosition
+                val shopId = shops[shopPos].first
+                val shopName = shops[shopPos].second
+                val name = edtName.text.toString().trim()
+                val buy = edtBuy.text.toString().trim().ifEmpty{"0"}
+                val sell = edtSell.text.toString().trim().ifEmpty{"0"}
+                val qtyStr = edtQty.text.toString().trim()
+                val supplier = edtSupplier.text.toString().trim()
+
+                if(name.isEmpty() || qtyStr.isEmpty()){ Toast.makeText(this@ReceiveStockActivity,"Name & Qty required",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                val qty = qtyStr.toFloatOrNull()?: 0f
+                if(qty<=0){ Toast.makeText(this@ReceiveStockActivity,"Invalid qty",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+
+                try{
+                    // 1. UPDATE products_db — GLOBAL — name|buy|sell|qty
+                    val existing = prefsProducts.getString(name,"")
+                    var newQty = qty
+                    var finalBuy = buy
+                    var finalSell = sell
+                    if(existing!=null && existing.contains("|")){
+                        val p = existing.split("|")
+                        if(p.size>=4){
+                            finalBuy = if(buy=="0") p[1] else buy
+                            finalSell = if(sell=="0") p[2] else sell
+                            newQty = (p[3].toFloatOrNull()?:0f) + qty
+                        }
+                    }
+                    val prodValue = "$name|$finalBuy|$finalSell|$newQty"
+                    prefsProducts.edit().putString(name, prodValue).apply()
+
+                    // 2. UPDATE inventory_db — PER SHOP — shopId_name => name|buy|sell|qty|shopId
+                    val invKey = "${shopId}_${name}".replace(" ","_").lowercase()
+                    val existingInv = prefsInventory.getString(invKey,"")
+                    var invQty = qty
+                    if(existingInv!=null && existingInv.contains("|")){
+                        val ip = existingInv.split("|")
+                        invQty = (ip.getOrNull(3)?.toFloatOrNull()?:0f) + qty
+                    }
+                    val invValue = "$name|$finalBuy|$finalSell|$invQty|$shopId"
+                    prefsInventory.edit().putString(invKey, invValue).apply()
+
+                    // 3. ALSO save to shop specific pref — stock_shopId
+                    val shopPref = getSharedPreferences("stock_$shopId", Context.MODE_PRIVATE)
+                    val shopExisting = shopPref.getString(name,"")
+                    var shopQty = qty
+                    if(shopExisting!=null && shopExisting.contains("|")){
+                        shopQty = (shopExisting.split("|").getOrNull(3)?.toFloatOrNull()?:0f) + qty
+                    }
+                    shopPref.edit().putString(name, "$name|$finalBuy|$finalSell|$shopQty|$shopId").apply()
+
+                    // 4. Audit log
+                    val audit = getSharedPreferences("audit", Context.MODE_PRIVATE)
+                    val logs = audit.getStringSet("logs", mutableSetOf())?.toMutableSet()?: mutableSetOf()
+                    val log = "${java.text.SimpleDateFormat("dd/MM HH:mm").format(java.util.Date())} RECEIVE $qty x $name to $shopName by ${if(supplier.isEmpty()) "GRN" else supplier}"
+                    logs.add(log)
+                    audit.edit().putStringSet("logs", logs).apply()
+
+                    txtInfo.text = "✅ RECEIVED $qty x $name to $shopName\nNew Global Qty: $newQty\nShop Qty: $invQty"
+                    txtInfo.setTextColor(Color.parseColor("#16A34A"))
+                    txtInfo.setTypeface(null, Typeface.BOLD)
+                    Toast.makeText(this@ReceiveStockActivity,"✅ Stock added to $shopName",Toast.LENGTH_LONG).show()
+
+                    edtName.setText(""); edtQty.setText(""); edtSupplier.setText("")
+
+                }catch(e:Exception){
+                    Toast.makeText(this@ReceiveStockActivity,"Error: ${e.message}",Toast.LENGTH_LONG).show()
+                }
             }
         }
+        root.addView(btnReceive)
+
+        setContentView(ScrollView(this).apply{addView(root)})
     }
 }
