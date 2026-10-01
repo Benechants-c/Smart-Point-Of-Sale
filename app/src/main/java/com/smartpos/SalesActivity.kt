@@ -2,8 +2,10 @@ package com.smartpos
 
 import android.app.Activity
 import android.app.Dialog
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -12,6 +14,8 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import java.io.OutputStream
+import java.util.*
 
 class SalesActivity : Activity() {
     data class Product(val code: String, val name: String, val cost: Double, val sell: Double, var qty: Int, val shopId: String, val dept: String)
@@ -30,6 +34,7 @@ class SalesActivity : Activity() {
     private val shops = mutableListOf<Pair<String,String>>()
     private val depts = mutableListOf<String>()
     private val ADMIN_PIN = "1234"
+    private var lastReceipt = ""
 
     private fun getShopId(): String = if (spinnerShop.selectedItemPosition in shops.indices) shops[spinnerShop.selectedItemPosition].first else "main"
     private fun getTotal(): Double { var t=0.0; for(c in cart) t+=c.product.sell*c.qty; return t }
@@ -66,7 +71,7 @@ class SalesActivity : Activity() {
         val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
         root.addView(TextView(this).apply{text="ADD STOCK - ADMIN"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
         val codeEd=EditText(this).apply{hint="Barcode / Code"}; val nameEd=EditText(this).apply{hint="Product Name"}
-        val costEd=EditText(this).apply{hint="Cost Price (hidden)"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
+        val costEd=EditText(this).apply{hint="Cost (hidden)"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
         val sellEd=EditText(this).apply{hint="Sell Price"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
         val qtyEd=EditText(this).apply{hint="Qty"; inputType=android.text.InputType.TYPE_CLASS_NUMBER}
         val deptEd=EditText(this).apply{hint="Department"}
@@ -136,10 +141,64 @@ class SalesActivity : Activity() {
         receiptView.text="RECEIPT: ${cart.size} items"; totalView.text="TOTAL: $${String.format("%.2f",total)}"; calcChange()
     }
 
+    private fun buildReceipt(): String {
+        val sb=StringBuilder()
+        sb.append(" ${shops.getOrNull(spinnerShop.selectedItemPosition)?.second?: "Main Shop"}\n")
+        sb.append("Date: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(java.util.Date())}\n")
+        sb.append("--------------------------------\n")
+        for(c in cart){ sb.append("${c.product.name} x${c.qty} $${String.format("%.2f",c.product.sell*c.qty)}\n") }
+        sb.append("--------------------------------\n")
+        sb.append("TOTAL: $${String.format("%.2f",getTotal())}\n")
+        sb.append("TENDERED: $${tenderedInput.text}\n")
+        sb.append("${changeView.text}\n")
+        sb.append("Thank you! Come again!\n\n\n")
+        return sb.toString()
+    }
+
+    // ANY BRAND 58mm PRINTER - Generic ESC/POS
+    private fun printToBluetoothDevice(device: BluetoothDevice){
+        try{
+            val uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+            val socket: BluetoothSocket = device.createRfcommSocketToServiceRecord(uuid)
+            BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+            socket.connect()
+            val os: OutputStream = socket.outputStream
+            // ESC/POS init
+            os.write(byteArrayOf(0x1B, 0x40)) // init
+            os.write(lastReceipt.toByteArray())
+            os.write(byteArrayOf(0x0A,0x0A,0x0A,0x0A)) // feed
+            os.write(byteArrayOf(0x1D, 0x56, 0x01)) // cut
+            os.flush(); Thread.sleep(500); os.close(); socket.close()
+            Toast.makeText(this,"Printed to ${device.name}",1).show()
+        }catch(e:Exception){
+            Toast.makeText(this,"Print failed: ${e.message}",1).show()
+        }
+    }
+
+    private fun showPrinterChooser(){
+        try{
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if(adapter==null){ Toast.makeText(this,"No Bluetooth",1).show(); return }
+            if(!adapter.isEnabled){ Toast.makeText(this,"Enable Bluetooth first",1).show(); return }
+            val paired = adapter.bondedDevices.toList()
+            if(paired.isEmpty()){ Toast.makeText(this,"No paired printer. Pair 58mm in Settings\nReceipt:\n$lastReceipt",1).show(); return }
+            val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
+            root.addView(TextView(this).apply{text="CHOOSE PRINTER - ANY 58mm"; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+            for(dev in paired){
+                val btn=Button(this).apply{text="${dev.name}\n${dev.address}"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE); textSize=12f}
+                btn.setOnClickListener{ dlg.dismiss(); printToBluetoothDevice(dev) }
+                root.addView(btn)
+            }
+            val close=Button(this).apply{text="CANCEL"; setBackgroundColor(Color.parseColor("#E5E7EB"))}; close.setOnClickListener{dlg.dismiss()}; root.addView(close)
+            dlg.setContentView(root); dlg.show(); dlg.window?.setLayout((resources.displayMetrics.widthPixels*0.92).toInt(),-2)
+        }catch(e:Exception){ Toast.makeText(this,"BT error: ${e.message}\n$lastReceipt",1).show() }
+    }
+
     private fun completeSale(){
         if(cart.isEmpty()){Toast.makeText(this,"Cart empty",0).show(); return}
         val total=getTotal(); val tendered=tenderedInput.text.toString().toDoubleOrNull()?:0.0
         if(tendered<total){Toast.makeText(this,"Tendered less than TOTAL",1).show(); return}
+        lastReceipt = buildReceipt()
         try{
             val shopId=getShopId()
             for(item in cart){
@@ -150,7 +209,8 @@ class SalesActivity : Activity() {
             val key="SALE_${System.currentTimeMillis()}"; val saleVal="${System.currentTimeMillis()}|$total|${getProfit()}|$tendered"
             salesPref.edit().putString(key,saleVal).apply()
         }catch(_:Exception){}
-        Toast.makeText(this,"SALE OK $${String.format("%.2f",total)}",1).show()
+        Toast.makeText(this,"SALE OK $${String.format("%.2f",total)}",0).show()
+        showPrinterChooser()
         cart.clear(); tenderedInput.setText(""); refreshCart(); loadRealStock()
     }
 
@@ -168,7 +228,7 @@ class SalesActivity : Activity() {
     private fun showDailyReport(){
         askAdminPin {
             val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
-            root.addView(TextView(this).apply{text="ADMIN REPORT - PROFIT HERE ONLY"; textSize=14f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+            root.addView(TextView(this).apply{text="ADMIN REPORT - PROFIT ONLY HERE"; textSize=14f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
             val reportView=TextView(this).apply{textSize=13f; setPadding(12,12,12,12)}
             var totalSales=0.0; var totalProfit=0.0; var count=0
             try{
@@ -193,7 +253,7 @@ class SalesActivity : Activity() {
         try{ val ps=getSharedPreferences("shops_db",Context.MODE_PRIVATE); for((k,_) in ps.all) shops.add(Pair(k,k)) }catch(_:Exception){}
         if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(8,8,8,8); setBackgroundColor(Color.parseColor("#F1F5F9"))}
-        root.addView(TextView(this).apply{text="POS V2.2 SECURE"; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
+        root.addView(TextView(this).apply{text="POS V2.3 PRINTER ANY BRAND"; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
         fun label(t:String)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12,6,12,6)}
         root.addView(label("SELECT SHOP"))
         spinnerShop=Spinner(this).apply{setBackgroundColor(Color.WHITE)}; spinnerShop.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,shops.map{it.second}); root.addView(spinnerShop)
@@ -217,7 +277,7 @@ class SalesActivity : Activity() {
         tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(-1,-2,1f).apply{setMargins(8,0,0,0)}; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,8,12,8)}; tenderRow.addView(tenderedInput); root.addView(tenderRow)
         changeView=TextView(this).apply{text="CHANGE: $0.00"; setBackgroundColor(Color.parseColor("#FEF3C7")); setPadding(12,16,12,16); setTypeface(null,Typeface.BOLD); textSize=18f; setTextColor(Color.parseColor("#16A34A")); gravity=Gravity.CENTER}
         root.addView(changeView)
-        root.addView(Button(this).apply{text="COMPLETE SALE"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
+        root.addView(Button(this).apply{text="COMPLETE SALE + PRINT ANY 58mm"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
         spinnerShop.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){loadRealStock()} override fun onNothingSelected(a:AdapterView<*>?){}}
         spinnerDept.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){refreshCart()} override fun onNothingSelected(a:AdapterView<*>?){}}
         setContentView(root); loadRealStock()
