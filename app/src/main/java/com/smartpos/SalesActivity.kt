@@ -2,7 +2,6 @@ package com.smartpos
 
 import android.app.Activity
 import android.app.Dialog
-import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -65,12 +64,12 @@ class SalesActivity : Activity() {
 
     private fun showStockManager(){
         val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
-        root.addView(TextView(this).apply{text="ADD / EDIT STOCK - ADMIN"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
-        val codeEd=EditText(this).apply{hint="Barcode / Code"}; val nameEd=EditText(this).apply{hint="Product Name e.g. dovi"}
-        val costEd=EditText(this).apply{hint="Cost Price (hidden from cashier)"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
+        root.addView(TextView(this).apply{text="ADD STOCK - ADMIN"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+        val codeEd=EditText(this).apply{hint="Barcode / Code"}; val nameEd=EditText(this).apply{hint="Product Name"}
+        val costEd=EditText(this).apply{hint="Cost Price (hidden)"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
         val sellEd=EditText(this).apply{hint="Sell Price"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL}
         val qtyEd=EditText(this).apply{hint="Qty"; inputType=android.text.InputType.TYPE_CLASS_NUMBER}
-        val deptEd=EditText(this).apply{hint="Department e.g. Groceries"}
+        val deptEd=EditText(this).apply{hint="Department"}
         for(v in listOf(codeEd,nameEd,costEd,sellEd,qtyEd,deptEd)){v.setPadding(12,12,12,12); v.setBackgroundColor(Color.parseColor("#F1F5F9")); val lp=LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,8,0,0); v.layoutParams=lp; root.addView(v)}
         val saveBtn=Button(this).apply{text="SAVE STOCK"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE)}
         saveBtn.setOnClickListener{
@@ -85,7 +84,7 @@ class SalesActivity : Activity() {
     private fun showSearchDialog(){
         val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
         root.addView(TextView(this).apply{text="Search Product"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
-        val ed=EditText(this).apply{hint="Enter name or code..."; layoutParams=LinearLayout.LayoutParams(-1,-2,-1); setPadding(20,14,20,14); setBackgroundColor(Color.parseColor("#F1F5F9"))}
+        val ed=EditText(this).apply{hint="Enter name or code..."; setPadding(20,14,20,14); setBackgroundColor(Color.parseColor("#F1F5F9"))}
         root.addView(ed); val listLay=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}; val scroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(listLay)}; root.addView(scroll)
         fun refreshList(q:String){
             listLay.removeAllViews(); filtered.clear(); val qq=q.trim().lowercase()
@@ -94,7 +93,7 @@ class SalesActivity : Activity() {
             for(p in filtered){
                 val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(14,12,14,12); setBackgroundColor(if(p.qty<5) Color.parseColor("#FEF2F2") else Color.WHITE)}
                 val left=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
-                left.addView(TextView(this).apply{text=p.name + if(p.qty<5)" ⚠️ LOW" else ""; textSize=14f; setTypeface(null,Typeface.BOLD)})
+                left.addView(TextView(this).apply{text=p.name + if(p.qty<5)" LOW" else ""; textSize=14f; setTypeface(null,Typeface.BOLD)})
                 left.addView(TextView(this).apply{text="${p.code} | Stock:${p.qty}"; textSize=11f; setTextColor(Color.GRAY)})
                 val price=TextView(this).apply{text="$${p.sell}"; textSize=14f; setTypeface(null,Typeface.BOLD); gravity=Gravity.END}
                 row.addView(left); row.addView(price); row.setOnClickListener{ addToCart(p); dlg.dismiss() }; listLay.addView(row)
@@ -106,37 +105,16 @@ class SalesActivity : Activity() {
         dlg.setContentView(root); dlg.show(); dlg.window?.setLayout((resources.displayMetrics.widthPixels*0.92).toInt(),-2)
     }
 
-    private fun showBarcodeDialog(){
-        val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
-        root.addView(TextView(this).apply{text="BARCODE SCAN"; textSize=16f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
-        val ed=EditText(this).apply{hint="Scan or type barcode..."; setPadding(20,20,20,20); setBackgroundColor(Color.parseColor("#F1F5F9")); textSize=18f}; root.addView(ed)
-        val scanBtn=Button(this).apply{text="📷 OPEN CAMERA SCANNER"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)}
-        scanBtn.setOnClickListener{ try{ val intent=Intent("com.google.zxing.client.android.SCAN"); intent.putExtra("SCAN_MODE","PRODUCT_MODE"); startActivityForResult(intent,1001)}catch(e:Exception){Toast.makeText(this@SalesActivity,"Install Barcode Scanner or type code",1).show()} }; root.addView(scanBtn)
-        ed.addTextChangedListener(object:TextWatcher{
-            override fun afterTextChanged(s:Editable?){
-                val code=s.toString().trim(); if(code.length>=2){ val found=allProducts.find{it.code.equals(code,true)}; if(found!=null){ addToCart(found); ed.setText(""); Toast.makeText(this@SalesActivity,"Added ${found.name}",0).show()} }
-            }
-            override fun beforeTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){} override fun onTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
-        })
-        val close=Button(this).apply{text="CLOSE"; setBackgroundColor(Color.parseColor("#E5E7EB"))}; close.setOnClickListener{dlg.dismiss()}; root.addView(close)
-        dlg.setContentView(root); dlg.show(); dlg.window?.setLayout((resources.displayMetrics.widthPixels*0.92).toInt(),-2)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if(requestCode==1001 && resultCode==RESULT_OK){ val code=data?.getStringExtra("SCAN_RESULT")?:""; val found=allProducts.find{it.code==code}; if(found!=null) addToCart(found) else Toast.makeText(this,"Barcode $code not in stock - Add it",1).show() }
-    }
-
     private fun addToCart(p: Product){
         val ex=cart.find{it.product.code==p.code}
-        if(ex!=null){ if(ex.qty<p.qty) ex.qty++ else Toast.makeText(this,"No more stock max ${p.qty}",0).show() } else cart.add(CartItem(p,1))
+        if(ex!=null){ if(ex.qty<p.qty) ex.qty++ else Toast.makeText(this,"Max ${p.qty}",0).show() } else cart.add(CartItem(p,1))
         refreshCart()
     }
 
     private fun refreshCart(){
         cartLayout.removeAllViews()
         val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(10,10,10,10); setBackgroundColor(Color.parseColor("#E2E0F0"))}
-        fun h(t:String,w:Float)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#475569")); layoutParams=LinearLayout.LayoutParams(0,-2,w); gravity=Gravity.CENTER_VERTICAL}
+        fun h(t:String,w:Float)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#475569")); layoutParams=LinearLayout.LayoutParams(0,-2,w)}
         header.addView(TextView(this).apply{text="#"; layoutParams=LinearLayout.LayoutParams(60,-2); setTypeface(null,Typeface.BOLD); textSize=11f})
         header.addView(h("ITEM",2f)); header.addView(h("QTY",1.3f)); header.addView(h("PRICE",1f)); header.addView(h("TOTAL",1f))
         cartLayout.addView(header)
@@ -155,25 +133,7 @@ class SalesActivity : Activity() {
             row.addView(TextView(this).apply{text="$${String.format("%.2f",line)}"; layoutParams=LinearLayout.LayoutParams(0,-2,1f); gravity=Gravity.END; setTypeface(null,Typeface.BOLD); textSize=12f})
             cartLayout.addView(row); cartLayout.addView(View(this).apply{layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB"))})
         }
-        receiptView.text="RECEIPT: ${cart.size} items"; totalView.text="PRODUCT TOTAL: $${String.format("%.2f",total)}"; calcChange()
-    }
-
-    private fun buildReceipt(): String {
-        val sb=StringBuilder(); sb.append("*** ${shops.getOrNull(spinnerShop.selectedItemPosition)?.second?: "Main Shop"} ***\n")
-        sb.append("Date: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(java.util.Date())}\n"); sb.append("--------------------------------\n")
-        for(c in cart){ sb.append("${c.product.name} x${c.qty} $${String.format("%.2f",c.product.sell*c.qty)}\n") }
-        sb.append("--------------------------------\n"); sb.append("TOTAL: $${String.format("%.2f",getTotal())}\n"); sb.append("TENDERED: $${tenderedInput.text}\n"); sb.append("CHANGE: ${changeView.text}\n"); sb.append("Thank you!\n"); return sb.toString()
-    }
-
-    private fun printBluetooth(){
-        val receipt=buildReceipt()
-        try{
-            val adapter=BluetoothAdapter.getDefaultAdapter()
-            if(adapter==null||!adapter.isEnabled){ Toast.makeText(this,"Enable Bluetooth",1).show(); return }
-            val paired=adapter.bondedDevices
-            if(paired.isEmpty()){ Toast.makeText(this,"No paired printer - Pair in settings\n$receipt",1).show(); return }
-            val device=paired.first(); Toast.makeText(this,"Printing to ${device.name}...\n$receipt",1).show()
-        }catch(e:Exception){ Toast.makeText(this,"Print error: ${e.message}",1).show() }
+        receiptView.text="RECEIPT: ${cart.size} items"; totalView.text="TOTAL: $${String.format("%.2f",total)}"; calcChange()
     }
 
     private fun completeSale(){
@@ -187,18 +147,17 @@ class SalesActivity : Activity() {
                 if(old.contains("|")){ val parts=old.split("|").toMutableList(); val oq=parts.getOrNull(3)?.toIntOrNull()?:0; parts[3]=(oq-item.qty).toString(); pref.edit().putString(item.product.code,parts.joinToString("|")).apply() }
             }
             val salesPref=getSharedPreferences("sales_$shopId",Context.MODE_PRIVATE)
-            val key="SALE_${System.currentTimeMillis()}"; val itemsStr=cart.joinToString(";"){ "${it.product.code}|${it.product.name}|${it.qty}|${it.product.sell}|${it.product.cost}" }
-            val saleVal="${System.currentTimeMillis()}|$total|${getProfit()}|$tendered|$itemsStr"
+            val key="SALE_${System.currentTimeMillis()}"; val saleVal="${System.currentTimeMillis()}|$total|${getProfit()}|$tendered"
             salesPref.edit().putString(key,saleVal).apply()
         }catch(_:Exception){}
-        printBluetooth(); Toast.makeText(this,"SALE OK $${String.format("%.2f",total)}",1).show()
+        Toast.makeText(this,"SALE OK $${String.format("%.2f",total)}",1).show()
         cart.clear(); tenderedInput.setText(""); refreshCart(); loadRealStock()
     }
 
     private fun askAdminPin(onOk: ()->Unit){
         val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(20,20,20,20); setBackgroundColor(Color.WHITE)}
-        root.addView(TextView(this).apply{text="ADMIN PIN REQUIRED"; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
-        val pinEd=EditText(this).apply{hint="Enter PIN (default 1234)"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD; setPadding(16,16,16,16); setBackgroundColor(Color.parseColor("#F1F5F9"))}
+        root.addView(TextView(this).apply{text="ADMIN PIN"; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+        val pinEd=EditText(this).apply{hint="PIN 1234"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD; setPadding(16,16,16,16); setBackgroundColor(Color.parseColor("#F1F5F9"))}
         root.addView(pinEd)
         val ok=Button(this).apply{text="UNLOCK"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE)}
         ok.setOnClickListener{ if(pinEd.text.toString()==ADMIN_PIN){dlg.dismiss(); onOk()} else Toast.makeText(this@SalesActivity,"Wrong PIN!",0).show() }
@@ -209,27 +168,23 @@ class SalesActivity : Activity() {
     private fun showDailyReport(){
         askAdminPin {
             val dlg=Dialog(this); val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(16,16,16,16); setBackgroundColor(Color.WHITE)}
-            root.addView(TextView(this).apply{text="ADMIN REPORT - PROFIT ONLY HERE"; textSize=14f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
-            val reportView=TextView(this).apply{textSize=13f; setPadding(12,12,12,12); setBackgroundColor(Color.parseColor("#F8FAFC"))}
-            var totalSales=0.0; var totalProfit=0.0; var count=0; val details=StringBuilder()
+            root.addView(TextView(this).apply{text="ADMIN REPORT - PROFIT HERE ONLY"; textSize=14f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(16,12,16,12)})
+            val reportView=TextView(this).apply{textSize=13f; setPadding(12,12,12,12)}
+            var totalSales=0.0; var totalProfit=0.0; var count=0
             try{
                 val shopId=getShopId(); val pref=getSharedPreferences("sales_$shopId",Context.MODE_PRIVATE)
                 val today=java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date())
                 for((_,v) in pref.all){
-                    val parts=v.toString().split("|"); if(parts.size>=4){
-                        val time=parts[0].toLongOrNull()?:0; val dateStr=java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(time))
-                        if(dateStr==today){ totalSales+=parts[1].toDoubleOrNull()?:0.0; totalProfit+=parts[2].toDoubleOrNull()?:0.0; count++ }
+                    val p=v.toString().split("|"); if(p.size>=3){
+                        val time=p[0].toLongOrNull()?:0; val dateStr=java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(time))
+                        if(dateStr==today){ totalSales+=p[1].toDoubleOrNull()?:0.0; totalProfit+=p[2].toDoubleOrNull()?:0.0; count++ }
                     }
                 }
-                // Last 10 sales detail
-                val sorted = pref.all.entries.sortedByDescending{ it.key }.take(10)
-                for(e in sorted){ val p=e.value.toString().split("|"); if(p.size>=4){ details.append("${java.text.SimpleDateFormat("HH:mm").format(java.util.Date(p[0].toLongOrNull()?:0))} - Sale $${p[1]} Profit $${p[2]}\n") } }
             }catch(_:Exception){}
-            reportView.text="Shop: ${shops.getOrNull(spinnerShop.selectedItemPosition)?.second}\nDate: ${java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date())}\n\nSales Today: $count\nTOTAL SALES: $${String.format("%.2f",totalSales)}\nTOTAL PROFIT: $${String.format("%.2f",totalProfit)}\n\n--- Last 10 Sales ---\n$details"
+            reportView.text="Shop: ${shops.getOrNull(spinnerShop.selectedItemPosition)?.second}\nDate: ${java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date())}\n\nSales Today: $count\nTOTAL SALES: $${String.format("%.2f",totalSales)}\nTOTAL PROFIT: $${String.format("%.2f",totalProfit)}"
             root.addView(reportView)
-            val scroll=ScrollView(this).apply{addView(reportView)}; root.addView(scroll)
             val close=Button(this).apply{text="CLOSE"; setBackgroundColor(Color.parseColor("#E5E7EB"))}; close.setOnClickListener{dlg.dismiss()}; root.addView(close)
-            dlg.setContentView(root); dlg.show(); dlg.window?.setLayout((resources.displayMetrics.widthPixels*0.92).toInt(),(resources.displayMetrics.heightPixels*0.8).toInt())
+            dlg.setContentView(root); dlg.show(); dlg.window?.setLayout((resources.displayMetrics.widthPixels*0.92).toInt(),-2)
         }
     }
 
@@ -238,33 +193,31 @@ class SalesActivity : Activity() {
         try{ val ps=getSharedPreferences("shops_db",Context.MODE_PRIVATE); for((k,_) in ps.all) shops.add(Pair(k,k)) }catch(_:Exception){}
         if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(8,8,8,8); setBackgroundColor(Color.parseColor("#F1F5F9"))}
-        root.addView(TextView(this).apply{text="POS SALES - V2.1 SECURE"; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
+        root.addView(TextView(this).apply{text="POS V2.2 SECURE"; textSize=18f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
         fun label(t:String)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12,6,12,6)}
         root.addView(label("SELECT SHOP"))
         spinnerShop=Spinner(this).apply{setBackgroundColor(Color.WHITE)}; spinnerShop.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,shops.map{it.second}); root.addView(spinnerShop)
         root.addView(label("DEPARTMENT"))
         spinnerDept=Spinner(this).apply{setBackgroundColor(Color.WHITE)}; depts.add("ALL DEPARTMENTS"); spinnerDept.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,depts); root.addView(spinnerDept)
-        val btnRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER}
-        val searchBtn=Button(this).apply{text="🔍 SEARCH"; setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
-        val barcodeBtn=Button(this).apply{text="📷 SCAN"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
-        val stockBtn=Button(this).apply{text="📦 STOCK"; setBackgroundColor(Color.parseColor("#EA580C")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
-        val reportBtn=Button(this).apply{text="🔒 ADMIN"; setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
-        searchBtn.setOnClickListener{showSearchDialog()}; barcodeBtn.setOnClickListener{showBarcodeDialog()}
-        stockBtn.setOnClickListener{ askAdminPin { showStockManager() } }; reportBtn.setOnClickListener{ showDailyReport() }
-        btnRow.addView(searchBtn); btnRow.addView(barcodeBtn); btnRow.addView(stockBtn); btnRow.addView(reportBtn); root.addView(btnRow)
-        root.addView(label("CART - Use - / + to change qty"))
+        val btnRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+        val searchBtn=Button(this).apply{text="SEARCH"; setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
+        val stockBtn=Button(this).apply{text="STOCK"; setBackgroundColor(Color.parseColor("#EA580C")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
+        val reportBtn=Button(this).apply{text="ADMIN"; setBackgroundColor(Color.parseColor("#DC2626")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,8,4,8)}}
+        searchBtn.setOnClickListener{showSearchDialog()}; stockBtn.setOnClickListener{ askAdminPin { showStockManager() } }; reportBtn.setOnClickListener{ showDailyReport() }
+        btnRow.addView(searchBtn); btnRow.addView(stockBtn); btnRow.addView(reportBtn); root.addView(btnRow)
+        root.addView(label("CART - Use - / +"))
         cartLayout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)}
         val scroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(cartLayout)}; root.addView(scroll)
         val receiptRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(12,10,12,10); setBackgroundColor(Color.parseColor("#E2E0F0"))}
         receiptView=TextView(this).apply{text="RECEIPT: 0 items"; setTypeface(null,Typeface.BOLD); textSize=12f; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
-        totalView=TextView(this).apply{text="PRODUCT TOTAL: $0.00"; setTypeface(null,Typeface.BOLD); textSize=14f; gravity=Gravity.END; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
+        totalView=TextView(this).apply{text="TOTAL: $0.00"; setTypeface(null,Typeface.BOLD); textSize=14f; gravity=Gravity.END; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
         receiptRow.addView(receiptView); receiptRow.addView(totalView); root.addView(receiptRow)
         val tenderRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(8,6,8,6); setBackgroundColor(Color.WHITE)}
         tenderRow.addView(TextView(this).apply{text="TENDERED $:"; setTypeface(null,Typeface.BOLD); textSize=12f})
         tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(-1,-2,1f).apply{setMargins(8,0,0,0)}; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,8,12,8)}; tenderRow.addView(tenderedInput); root.addView(tenderRow)
         changeView=TextView(this).apply{text="CHANGE: $0.00"; setBackgroundColor(Color.parseColor("#FEF3C7")); setPadding(12,16,12,16); setTypeface(null,Typeface.BOLD); textSize=18f; setTextColor(Color.parseColor("#16A34A")); gravity=Gravity.CENTER}
         root.addView(changeView)
-        root.addView(Button(this).apply{text="COMPLETE SALE + PRINT"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
+        root.addView(Button(this).apply{text="COMPLETE SALE"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
         spinnerShop.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){loadRealStock()} override fun onNothingSelected(a:AdapterView<*>?){}}
         spinnerDept.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){refreshCart()} override fun onNothingSelected(a:AdapterView<*>?){}}
         setContentView(root); loadRealStock()
