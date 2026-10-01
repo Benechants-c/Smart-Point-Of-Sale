@@ -22,6 +22,7 @@
         </activity>
 
         <activity android:name=".AdminActivity" android:exported="false" />
+        <activity android:name=".AuditLogActivity" android:exported="false" />
         <activity android:name=".AdminDetailActivity" android:exported="false" />
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
         <activity android:name=".BranchesActivity" android:exported="false" />
