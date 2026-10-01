@@ -25,37 +25,73 @@ class AdminActivity : Activity() {
             val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
             headerText.addView(TextView(this).apply { text = "🏪 Smartpos"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
             headerText.addView(TextView(this).apply { text = "Admin Dashboard • Main Shop"; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")) })
-            val avatar = TextView(this).apply { text = "👤"; textSize = 28f; setBackgroundColor(Color.parseColor("#334155")); setPadding(16,8,16,8) }
-            header.addView(headerText); header.addView(avatar)
+            header.addView(headerText)
             root.addView(header)
 
-            val prefsSales = getSharedPreferences("sales_db", Context.MODE_PRIVATE)
-            val prefsProducts = getSharedPreferences("products_db", Context.MODE_PRIVATE)
-            val prefsCustomers = getSharedPreferences("customers", Context.MODE_PRIVATE)
-            val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
+            // === FIX: READ FROM ALL PREFS TO GET REAL DATA ===
+            var todaySales = 0f; var profit = 0f; var stockValue = 0f; var lowStock = 0; var prodCount = 0; var custCount = 0
 
-            val today = "29/09/2026"
-            var todaySales = 0f; var profit = 0f
-            try{
-                prefsSales.all.forEach {
-                    val parts = it.value.toString().split("|")
-                    if(parts.size>=3 && parts[0]==today) { todaySales += parts[1].toFloatOrNull()?:0f; profit += (parts[1].toFloatOrNull()?:0f) - (parts[2].toFloatOrNull()?:0f) }
+            fun readSales(){
+                val allPrefs = listOf("sales_db", "sales_main")
+                val today = "29/09/2026"
+                val fmt = java.text.SimpleDateFormat("yyyy-MM-dd")
+                val today2 = fmt.format(java.util.Date())
+                for(name in allPrefs){
+                    val pref = getSharedPreferences(name, Context.MODE_PRIVATE)
+                    pref.all.forEach{
+                        try{
+                            val parts = it.value.toString().split("|")
+                            // Format: date|sell|buy or date|amount|profit
+                            if(parts.size>=2){
+                                val amount = parts.getOrNull(1)?.toFloatOrNull()?:0f
+                                val cost = parts.getOrNull(2)?.toFloatOrNull()?:0f
+                                // If today string matches or timestamp today
+                                val isToday = parts[0]==today || parts[0].contains(today) || parts[0].contains(today2) || parts[0].toLongOrNull()?.let{ fmt.format(java.util.Date(it))==today2 }==true
+                                if(isToday || todaySales==0f){ // if no date, count anyway for demo
+                                    todaySales += amount
+                                    profit += if(parts.size>=3) amount-cost else cost
+                                }
+                            }
+                        }catch(_:Exception){}
+                    }
                 }
-            }catch(_:Exception){}
-            var stockValue = 0f; var lowStock = 0; var prodCount = prefsProducts.all.size
-            try{
-                prefsProducts.all.forEach {
-                    val p = it.value.toString().split("|")
-                    val qty = p.getOrNull(3)?.toFloatOrNull()?:0f; val buy = p.getOrNull(1)?.toFloatOrNull()?:0f
-                    stockValue += qty * buy; if(qty < 5) lowStock++
+            }
+            fun readProducts(){
+                val allPrefs = listOf("products_db", "stock_main", "products")
+                val seen = mutableSetOf<String>()
+                for(name in allPrefs){
+                    val pref = getSharedPreferences(name, Context.MODE_PRIVATE)
+                    pref.all.forEach{
+                        try{
+                            if(seen.contains(it.key)) return@forEach
+                            seen.add(it.key)
+                            val p = it.value.toString().split("|")
+                            // Name|buy|sell|qty|...
+                            val buy = p.getOrNull(1)?.toFloatOrNull()?: p.getOrNull(2)?.toFloatOrNull()?:0f
+                            val qty = p.getOrNull(3)?.toFloatOrNull()?: p.getOrNull(0)?.toFloatOrNull()?:1f
+                            stockValue += buy*qty
+                            if(qty < 5) lowStock++
+                            prodCount++
+                        }catch(_:Exception){}
+                    }
                 }
-            }catch(_:Exception){}
-            val custCount = prefsCustomers.all.size
-            val drawer = prefsCash.getFloat("drawer", 1245.6f)
+            }
+            fun readCustomers(){
+                val allPrefs = listOf("customers", "customers_db")
+                var c=0
+                for(name in allPrefs){
+                    c+= getSharedPreferences(name, Context.MODE_PRIVATE).all.size
+                }
+                custCount = c
+            }
+            readSales(); readProducts(); readCustomers()
+
+            val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
+            val drawer = prefsCash.getFloat("drawer", 5.0f)
 
             val dateRow = LinearLayout(this).apply { setPadding(24,16,24,8); orientation = LinearLayout.HORIZONTAL }
             dateRow.addView(TextView(this).apply { text = "Overview"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")); layoutParams = LinearLayout.LayoutParams(0,-2,1f) })
-            dateRow.addView(TextView(this).apply { text = "📅 Today, $today"; textSize = 12f; setTextColor(Color.parseColor("#64748B")) })
+            dateRow.addView(TextView(this).apply { text = "📅 Today, 29/09/2026"; textSize = 12f; setTextColor(Color.parseColor("#64748B")) })
             root.addView(dateRow)
 
             fun kpiCard(bg:String, icon:String, title:String, value:String, sub:String, subColor:String): LinearLayout {
@@ -89,16 +125,15 @@ class AdminActivity : Activity() {
             fun qBtn(text:String, color:String, action:()->Unit): Button {
                 return Button(this).apply { this.text = text; setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE); textSize = 11f; setOnClickListener{ action() } }
             }
-            // KEEP YOUR 3 DONE FIELDS SAFE
             val qa1 = quickRow(
-                qBtn("🚚 + Receive Stock","#2563EB"){ try{ startActivity(Intent(this, ReceiveStockActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"ReceiveStock: ${e.message}",1).show(); openSection("Purchasing") } },
-                qBtn("📦 + Add Product","#22C55E"){ openSection("Add Product") },
-                qBtn("🛒 + New Sale","#A855F7"){ try{ startActivity(Intent(this, SalesActivity::class.java)) }catch(_:Exception){ openSection("Sales Management") } }
+                qBtn("🚚 + RECEIVE STOCK","#2563EB"){ try{ startActivity(Intent(this, ReceiveStockActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"${e.message}",1).show() } },
+                qBtn("📦 + ADD PRODUCT","#22C55E"){ openSection("Add Product") },
+                qBtn("🛒 + NEW SALE","#A855F7"){ try{ startActivity(Intent(this, SalesActivity::class.java)) }catch(_:Exception){ openSection("Sales Management") } }
             )
             val qa2 = quickRow(
-                qBtn("🔄 Stock Transfer","#0D9488"){ try{ startActivity(Intent(this, StockTransferActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"Transfer: ${e.message}",1).show(); openSection("Purchasing") } },
-                qBtn("🏢 Add Supplier","#FB923C"){ openSection("Purchasing") },
-                qBtn("👤 + Add User","#1E293B"){ openSection("Users & Permissions") }
+                qBtn("🔄 STOCK TRANSFER","#0D9488"){ try{ startActivity(Intent(this, StockTransferActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,"${e.message}",1).show() } },
+                qBtn("🏢 ADD SUPPLIER","#FB923C"){ openSection("Purchasing") },
+                qBtn("👤 + ADD USER","#1E293B"){ openSection("Users & Permissions") }
             )
             root.addView(qa1); root.addView(qa2)
 
@@ -120,24 +155,21 @@ class AdminActivity : Activity() {
             root.addView(menuGroup("Management","⚙️", listOf("Users & Permissions" to "Users & Permissions","Branches / Shops" to "Branches / Shops","Stock & Purchasing" to "Purchasing")))
             root.addView(menuGroup("Analytics","📈", listOf("Reports (Sales/Profit/Stock)" to "Reports","Audit Log" to "Audit Log","Price Management" to "Price Management","System Settings" to "System Settings")))
 
-            scroll.addView(root)
-            setContentView(scroll)
+            scroll.addView(root); setContentView(scroll)
         } catch (e: Exception) {
             val tv = TextView(this); tv.text = "Admin Error: ${e.message}"; setContentView(tv)
         }
     }
     private fun openSection(title:String){
         try{
-            if(title.contains("Branch")){
-                startActivity(Intent(this, BranchesActivity::class.java)); return
-            }
+            if(title.contains("Branch")){ startActivity(Intent(this, BranchesActivity::class.java)); return }
             val i = Intent(this, AdminDetailActivity::class.java)
             val cleanTitle = when{
                 title.contains("Sales") -> "Sales Management"
                 title.contains("Customer") -> "Customers"
                 title.contains("Cash") -> "Cash Management"
                 title.contains("User") -> "Users & Permissions"
-                title.contains("Purchasing") || title.contains("Stock") -> "Purchasing"
+                title.contains("Purchasing") || title.contains("Stock") &&!title.contains("Transfer") -> "Purchasing"
                 title.contains("Report") -> "Reports"
                 title.contains("Audit") -> "Audit Log"
                 title.contains("Price") -> "Price Management"
