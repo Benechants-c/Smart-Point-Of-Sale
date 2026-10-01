@@ -17,8 +17,6 @@ class AdminActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setBackgroundColor(Color.parseColor("#F8FAFC"))
             }
-
-            // ===== HEADER =====
             val header = LinearLayout(this).apply {
                 setBackgroundColor(Color.parseColor("#1E293B"))
                 setPadding(30,40,30,30)
@@ -32,25 +30,23 @@ class AdminActivity : Activity() {
             header.addView(headerText); header.addView(avatar)
             root.addView(header)
 
-            // ===== DATE =====
             val prefsSales = getSharedPreferences("sales_db", Context.MODE_PRIVATE)
             val prefsProducts = getSharedPreferences("products_db", Context.MODE_PRIVATE)
             val prefsCustomers = getSharedPreferences("customers", Context.MODE_PRIVATE)
             val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
 
-            // REAL CALCULATIONS - NOT DEMO
             val today = "29/09/2026"
             var todaySales = 0f; var profit = 0f
             prefsSales.all.forEach {
                 try {
-                    val parts = it.value.toString().split("|") // date|amount|cost
+                    val parts = it.value.toString().split("|")
                     if(parts[0]==today) { todaySales += parts[1].toFloat(); profit += (parts[1].toFloat() - parts[2].toFloat()) }
                 } catch(_:Exception){}
             }
             var stockValue = 0f; var lowStock = 0; var prodCount = prefsProducts.all.size
             prefsProducts.all.forEach {
                 try {
-                    val p = it.value.toString().split("|") // name|buy|sell|qty
+                    val p = it.value.toString().split("|")
                     val qty = p[3].toFloat(); val buy = p[1].toFloat()
                     stockValue += qty * buy
                     if(qty < 5) lowStock++
@@ -64,7 +60,6 @@ class AdminActivity : Activity() {
             dateRow.addView(TextView(this).apply { text = "📅 Today, $today"; textSize = 12f; setTextColor(Color.parseColor("#64748B")) })
             root.addView(dateRow)
 
-            // ===== 6 KPI CARDS - REAL DATA =====
             fun kpiCard(bg:String, icon:String, title:String, value:String, sub:String, subColor:String): LinearLayout {
                 return LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
@@ -87,7 +82,6 @@ class AdminActivity : Activity() {
             row2.addView(kpiCard("#FED7AA","👥","Customers","$custCount","REAL","#EA580C"))
             root.addView(row1); root.addView(row2)
 
-            // ===== QUICK ACTIONS - FUNCTIONAL =====
             root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,8,24,8) })
             fun quickRow(b1:Button, b2:Button, b3:Button): LinearLayout {
                 val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
@@ -102,19 +96,18 @@ class AdminActivity : Activity() {
                 qBtn("📦 + Add Product","#22C55E"){ openSection("Add Product") },
                 qBtn("🛒 + New Sale","#A855F7"){ openSection("Sales Management") }
             )
+            // ===== FIXED BUILD 131 — DIRECT =====
             val qa2 = quickRow(
-                qBtn("🔄 Stock Transfer","#0D9488"){ openSection("Branches / Shops") },
+                qBtn("🔄 Stock Transfer","#0D9488"){ try{ startActivity(Intent(this, StockTransferActivity::class.java)) }catch(e:Exception){Toast.makeText(this,e.message,Toast.LENGTH_LONG).show()} },
                 qBtn("🏢 Add Supplier","#FB923C"){ openSection("Purchasing") },
                 qBtn("👤 + Add User","#1E293B"){ openSection("Users & Permissions") }
             )
             root.addView(qa1); root.addView(qa2)
 
-            // ===== ADMIN MENU GROUPED - FUNCTIONAL =====
             root.addView(TextView(this).apply { text = "Admin Menu"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
-
             fun menuGroup(title:String, icon:String, items:List<Pair<String,String>>): LinearLayout {
                 val group = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,8,16,8)} }
-                group.addView(TextView(this).apply { text = "$icon  $title"; textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")) })
+                group.addView(TextView(this).apply { text = "$icon $title"; textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")) })
                 items.forEach { (name, target) ->
                     val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,16,12,16); gravity = android.view.Gravity.CENTER_VERTICAL }
                     row.addView(TextView(this).apply { text = name; textSize = 13f; layoutParams = LinearLayout.LayoutParams(0,-2,1f); setTextColor(Color.parseColor("#334155")) })
@@ -129,10 +122,9 @@ class AdminActivity : Activity() {
             root.addView(menuGroup("Management","⚙️", listOf("Users & Permissions" to "Users & Permissions","Branches / Shops" to "Branches / Shops","Stock & Purchasing" to "Purchasing")))
             root.addView(menuGroup("Analytics","📈", listOf("Reports (Sales/Profit/Stock)" to "Reports","Audit Log" to "Audit Log","Price Management" to "Price Management","System Settings" to "System Settings")))
 
-            // ===== RECENT ACTIVITY - REAL =====
             root.addView(TextView(this).apply { text = "Recent Activity"; textSize = 14f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
             val prefsAudit = getSharedPreferences("audit", Context.MODE_PRIVATE)
-            val logs = prefsAudit.getStringSet("logs", mutableSetOf())?.toList() ?: listOf()
+            val logs = prefsAudit.getStringSet("logs", mutableSetOf())?.toList()?: listOf()
             val activityBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,0,16,24)} }
             if(logs.isEmpty()){
                 activityBox.addView(TextView(this).apply { text = "No sales yet — do first sale to see log"; setTextColor(Color.parseColor("#64748B")) })
@@ -151,8 +143,12 @@ class AdminActivity : Activity() {
     }
     private fun openSection(title:String){
         try{
+            // DIRECT FOR BRANCHES TOO — BUILD 131
+            if(title.contains("Branch")){
+                startActivity(Intent(this, BranchesActivity::class.java))
+                return
+            }
             val i = Intent(this, AdminDetailActivity::class.java)
-            i.putExtra("TITLE", title.split(" ").take(3).joinToString(" ").replace("(","").replace(")",""))
             val cleanTitle = when{
                 title.contains("Sales") -> "Sales Management"
                 title.contains("Customer") -> "Customers"
