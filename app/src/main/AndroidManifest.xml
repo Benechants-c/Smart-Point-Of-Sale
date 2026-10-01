@@ -19,8 +19,9 @@
         <activity android:name=".AdminActivity" android:exported="false" />
         <activity android:name=".AdminDetailActivity" android:exported="false" />
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
-        <activity android:name=".BranchesActivity" />
-        <activity android:name=".StockTransferActivity" />
+        <activity android:name=".BranchesActivity" android:exported="false" />
+        <activity android:name=".StockTransferActivity" android:exported="false" />
+        <activity android:name=".PosLoginActivity" android:exported="true" />
         <activity android:name=".SalesActivity" android:exported="false" />
     </application>
 
