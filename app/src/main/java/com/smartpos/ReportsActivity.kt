@@ -9,8 +9,6 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import java.text.SimpleDateFormat
-import java.util.*
 
 class ReportsActivity : Activity() {
     override fun onCreate(b: Bundle?) {
@@ -22,13 +20,10 @@ class ReportsActivity : Activity() {
         try {
             val pref = getSharedPreferences("sales_main", Context.MODE_PRIVATE)
             for (v in pref.all.values) {
-                val s = v.toString()
-                val parts = s.split("|")
+                val parts = v.toString().split("|")
                 if (parts.size >= 3) {
-                    val amt = parts[1].toFloatOrNull()?: 0f
-                    val prof = parts[2].toFloatOrNull()?: 0f
-                    totalSales += amt
-                    totalProfit += prof
+                    totalSales += parts[1].toFloatOrNull()?:0f
+                    totalProfit += parts[2].toFloatOrNull()?:0f
                 }
             }
         } catch (_: Exception) {}
@@ -37,6 +32,7 @@ class ReportsActivity : Activity() {
             totalSales = 30f
             totalProfit = 10f
         }
+        val totalCost = totalSales - totalProfit
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
@@ -56,11 +52,12 @@ class ReportsActivity : Activity() {
         content.orientation = LinearLayout.VERTICAL
         content.setPadding(20, 20, 20, 20)
 
-        fun makeCard(title: String, value: String): TextView {
+        fun card(t: String, v: String, c: String): TextView {
             val tv = TextView(this)
-            tv.text = title + "\n" + value
+            tv.text = t + "\n" + v
             tv.textSize = 18f
             tv.setTypeface(null, Typeface.BOLD)
+            tv.setTextColor(Color.parseColor(c))
             tv.setBackgroundColor(Color.WHITE)
             tv.setPadding(20, 20, 20, 20)
             tv.gravity = Gravity.CENTER
@@ -70,14 +67,56 @@ class ReportsActivity : Activity() {
             return tv
         }
 
-        content.addView(makeCard("Total Sales", "$ " + totalSales.toString()))
-        content.addView(makeCard("Total Profit REAL", "$ " + totalProfit.toString() + " ($5 per sale)"))
+        content.addView(card("Total Sales", "$ " + totalSales.toString(), "#0F172A"))
+        content.addView(card("Total Profit REAL", "$ " + totalProfit.toString(), "#16A34A"))
 
-        val count = (totalSales.toInt() / 15)
-        content.addView(makeCard("Transactions", count.toString() + " sales"))
+        // --- BAR CHART PURE ANDROID ---
+        val barTitle = TextView(this)
+        barTitle.text = "\n📊 Sales vs Profit vs Cost"
+        barTitle.setTypeface(null, Typeface.BOLD)
+        barTitle.textSize = 16f
+        content.addView(barTitle)
 
+        fun addBar(label: String, value: Float, max: Float, color: String) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.setMargins(0, 8, 0, 8)
+            row.layoutParams = lp
+
+            val lab = TextView(this)
+            lab.text = label
+            lab.width = 120
+
+            val bar = TextView(this)
+            bar.setBackgroundColor(Color.parseColor(color))
+            val percent = (value / max * 200).toInt().coerceAtLeast(30)
+            bar.width = percent
+            bar.text = " $" + value.toInt().toString()
+            bar.setTextColor(Color.WHITE)
+            bar.setPadding(10, 10, 10, 10)
+
+            row.addView(lab)
+            row.addView(bar)
+            content.addView(row)
+        }
+
+        val maxVal = totalSales
+        addBar("Sales", totalSales, maxVal, "#3B82F6")
+        addBar("Profit", totalProfit, maxVal, "#22C55E")
+        addBar("Cost", totalCost, maxVal, "#EF4444")
+
+        // --- PROFIT BREAKDOWN ---
+        val pieTitle = TextView(this)
+        pieTitle.text = "\n🥧 Profit Breakdown"
+        pieTitle.setTypeface(null, Typeface.BOLD)
+        pieTitle.textSize = 16f
+        content.addView(pieTitle)
+
+        val trans = (totalSales.toInt() / 15)
         val info = TextView(this)
-        info.text = "Formula: Sale $15 Buy $10 = Profit $5 REAL\n2 sales = $30 sales / $10 profit"
+        info.text = "Transactions: " + trans.toString() + " sales\nEach: Sell $15 | Buy $10 | Profit $5\n\nFormula: Profit = Sales - Cost\n$" + totalSales.toInt().toString() + " - $" + totalCost.toInt().toString() + " = $" + totalProfit.toInt().toString() + " REAL"
+        info.setBackgroundColor(Color.WHITE)
         info.setPadding(20, 20, 20, 20)
         content.addView(info)
 
