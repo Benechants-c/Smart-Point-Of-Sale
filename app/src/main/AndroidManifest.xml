@@ -1,39 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.smartpos">
-    
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+<application
+    android:allowBackup="true"
+    android:label="SMART POS"
+    android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-    <application
-        android:allowBackup="true"
-        android:label="SMART POS"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+    <activity android:name=".LoginActivity" android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
 
-        <activity
-            android:name=".LoginActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+    <activity android:name=".AdminActivity" android:exported="false"/>
+    <activity android:name=".AdminDetailActivity" android:exported="false"/>
+    <activity android:name=".AuditLogActivity" android:exported="false"/>
+    <activity android:name=".BranchesActivity" android:exported="false"/>
+    <activity android:name=".PosLoginActivity" android:exported="false"/>
+    <activity android:name=".ReceiveStockActivity" android:exported="false"/>
+    <activity android:name=".ReportsActivity" android:exported="false"/>
+    <activity android:name=".SalesActivity" android:exported="false"/>
+    <activity android:name=".StockPurchasingActivity" android:exported="false"/>
+    <activity android:name=".StockTransferActivity" android:exported="false"/>
+    <activity android:name=".SuperAdminActivity" android:exported="false"/>
+    <activity android:name=".UsersActivity" android:exported="false"/>
 
-        <activity android:name=".ReportsActivity" android:exported="false" />
-        <activity android:name=".AdminActivity" android:exported="false" />
-        <activity android:name=".AuditLogActivity" android:exported="false" />
-        <activity android:name=".AdminDetailActivity" android:exported="false" />
-        <activity android:name=".ReceiveStockActivity" android:exported="false" />
-        <activity android:name=".BranchesActivity" android:exported="false" />
-        <activity android:name=".StockTransferActivity" android:exported="false" />
-        <activity android:name=".PosLoginActivity" android:exported="false" />
-        <activity android:name=".SalesActivity" android:exported="false" />
-        <activity android:name=".StockActivity" android:exported="false" />
-        <activity android:name=".StockPurchasingActivity" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="false" />
-
-    </application>
-
-</manifest>
+</application>
