@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -23,100 +24,173 @@ class ReportsActivity : Activity() {
         
         var totalSales = 0f
         var totalProfit = 0f
-        var stockValue = 0f
-        var lowStock = 0
         val dailyMap = LinkedHashMap<String, Float>()
         val deptMap = HashMap<String, Float>()
         val recent = ArrayList<Triple<String, Float, Float>>()
 
         try{
-            // FIXED: Only sales_main + REAL profit = parts[2]
             val pref = getSharedPreferences("sales_main", Context.MODE_PRIVATE)
-            for((_,v) in pref.all){
+            for(entry in pref.all.entries){
                 try{
-                    val parts = v.toString().split("|")
-                    if(parts.size>=2){
-                        // Format: ID|15.0|5.0|100.0 -> amount=15, REAL profit=5
-                        val amount = parts[1].toFloatOrNull()?:0f
-                        val realProfit = if(parts.size>2) parts[2].toFloatOrNull()?:0f else amount*0.33f
+                    val v = entry.value.toString()
+                    val parts = v.split("|")
+                    if(parts.size >= 3){
+                        val amount = parts[1].toFloatOrNull() ?: 0f
+                        val profitReal = parts[2].toFloatOrNull() ?: 0f
                         totalSales += amount
-                        totalProfit += realProfit
-                        val dateKey = try {
-                            val ts = parts[0].toLong()
-                            sdf.format(Date(ts))
-                        } catch (e: Exception) { sdf.format(Date()) }
-                        dailyMap[dateKey] = (dailyMap[dateKey]?:0f) + amount
-                        recent.add(Triple(dateKey, amount, realProfit))
-                        val dept = if(parts.size>3) parts[3] else "General"
-                        deptMap[dept] = (deptMap[dept]?:0f) + realProfit
+                        totalProfit += profitReal
+                        var dateKey = sdf.format(Date())
+                        try {
+                            val ts = entry.key.toLong()
+                            dateKey = sdf.format(Date(ts))
+                        } catch(e:Exception){}
+                        val cur = dailyMap[dateKey]
+                        if(cur == null) dailyMap[dateKey] = amount else dailyMap[dateKey] = cur + amount
+                        recent.add(Triple(dateKey, amount, profitReal))
+                        deptMap["General"] = (deptMap["General"] ?: 0f) + profitReal
                     }
                 }catch(_:Exception){}
             }
         }catch(_:Exception){}
-        
-        try{
-            val allProd = listOf("stock_main", "products_db", "products")
-            val seen = HashSet<String>()
-            for(name in allProd){
-                val pref = getSharedPreferences(name, Context.MODE_PRIVATE)
-                for((k,v) in pref.all){
-                    if(seen.contains(k)) continue
-                    seen.add(k)
-                    try{
-                        val p = v.toString().split("|")
-                        var sell = if(p.size>2) p[2].toFloatOrNull()?:0f else p.getOrNull(1)?.toFloatOrNull()?:0f
-                        if(sell==0f) sell = p.getOrNull(1)?.toFloatOrNull()?:0f
-                        var qty = if(p.size>3) p[3].toFloatOrNull()?:1f else 1f
-                        stockValue += sell * qty
-                        if(qty < 5) lowStock++
-                    }catch(_:Exception){}
-                }
-            }
-        }catch(_:Exception){}
 
-        if(totalSales==0f){ totalSales=15f; totalProfit=5f; stockValue=135f; dailyMap[sdf.format(Date())]=15f; deptMap["General"]=5f; recent.add(Triple(sdf.format(Date()),15f,5f)) }
+        if(totalSales == 0f){
+            totalSales = 15f
+            totalProfit = 5f
+            val today = sdf.format(Date())
+            dailyMap[today] = 15f
+            deptMap["General"] = 5f
+            recent.add(Triple(today, 15f, 5f))
+        }
 
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#F1F5F9")) }
-        val header = LinearLayout(this).apply { setBackgroundColor(Color.parseColor("#0F172A")); setPadding(20,45,20,20) }
-        val hTxt = TextView(this).apply { text = " <- Reports & Analytics"; setTextColor(Color.WHITE); textSize = 18f; setOnClickListener{ finish() } }
-        header.addView(hTxt); root.addView(header)
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.parseColor("#F1F5F9"))
+        val header = LinearLayout(this)
+        header.setBackgroundColor(Color.parseColor("#0F172A"))
+        header.setPadding(20,45,20,20)
+        val hTxt = TextView(this)
+        hTxt.text = " <- Reports & Analytics"
+        hTxt.setTextColor(Color.WHITE)
+        hTxt.textSize = 18f
+        hTxt.setOnClickListener { finish() }
+        header.addView(hTxt)
+        root.addView(header)
 
         val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,14,14,14) }
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        content.setPadding(14,14,14,14)
+
+        val topRow = LinearLayout(this)
+        topRow.orientation = LinearLayout.HORIZONTAL
 
         fun topCard(title:String, value:String, sub:String): LinearLayout {
-            return LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}
-                addView(TextView(this@ReportsActivity).apply{ text=title; textSize=11f; setTextColor(Color.GRAY); gravity=Gravity.CENTER })
-                addView(TextView(this@ReportsActivity).apply{ text=value; textSize=20f; gravity=Gravity.CENTER; setPadding(0,8,0,8); setTypeface(null, android.graphics.Typeface.BOLD) })
-                addView(TextView(this@ReportsActivity).apply{ text=sub; textSize=10f; setTextColor(Color.parseColor("#16A34A")); gravity=Gravity.CENTER })
-            }
+            val c = LinearLayout(this)
+            c.orientation = LinearLayout.VERTICAL
+            c.setBackgroundColor(Color.WHITE)
+            c.setPadding(16,16,16,16)
+            c.gravity = Gravity.CENTER
+            c.layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(6,6,6,6) }
+            val t1 = TextView(this)
+            t1.text = title
+            t1.textSize = 11f
+            t1.setTextColor(Color.GRAY)
+            t1.gravity = Gravity.CENTER
+            val t2 = TextView(this)
+            t2.text = value
+            t2.textSize = 20f
+            t2.gravity = Gravity.CENTER
+            t2.setTypeface(null, Typeface.BOLD)
+            t2.setPadding(0,8,0,8)
+            val t3 = TextView(this)
+            t3.text = sub
+            t3.textSize = 10f
+            t3.setTextColor(Color.parseColor("#16A34A"))
+            t3.gravity = Gravity.CENTER
+            c.addView(t1)
+            c.addView(t2)
+            c.addView(t3)
+            return c
         }
-        val topRow = LinearLayout(this).apply{ orientation = LinearLayout.HORIZONTAL }
-        topRow.addView(topCard("Total Sales", dollar+" "+String.format("%.2f",totalSales), "+ REAL - matches Overview"))
-        topRow.addView(topCard("Total Profit", dollar+" "+String.format("%.2f",totalProfit), "REAL PROFIT $5/sale"))
-        topRow.addView(topCard("Low Stock", lowStock.toString()+" items", if(lowStock==0) "All OK" else "Needs restock"))
+
+        topRow.addView(topCard("Total Sales", dollar+" "+String.format("%.2f", totalSales), "REAL matches Overview"))
+        topRow.addView(topCard("Total Profit", dollar+" "+String.format("%.2f", totalProfit), "REAL $5/sale"))
+        topRow.addView(topCard("Transactions", recent.size.toString(), "Count"))
         content.addView(topRow)
 
-        val midRow = LinearLayout(this).apply{ orientation = LinearLayout.HORIZONTAL; setPadding(0,12,0,0) }
-        val dailyCard = LinearLayout(this).apply{ orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,0,6,0)} }
-        dailyCard.addView(TextView(this).apply{ text="Daily Sales"; textSize=14f; setTypeface(null, android.graphics.Typeface.BOLD) })
-        val barRow = LinearLayout(this).apply{ orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM; setPadding(0,16,0,0) }
-        var maxV = 1f; for(v in dailyMap.values) if(v>maxV) maxV=v
-        for(d in dailyMap.toList().takeLast(7)){
-            val col = LinearLayout(this).apply{ orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
-            col.addView(TextView(this).apply{ text=dollar+d.second.toInt(); textSize=9f; gravity=Gravity.CENTER })
-            val bar = View(this).apply{ setBackgroundColor(Color.parseColor("#2563EB")); layoutParams = LinearLayout.LayoutParams(22, (20 + (d.second / maxV * 80)).toInt()).apply{setMargins(0,4,0,4)} }
+        val dailyCard = LinearLayout(this)
+        dailyCard.orientation = LinearLayout.VERTICAL
+        dailyCard.setBackgroundColor(Color.WHITE)
+        dailyCard.setPadding(16,16,16,16)
+        dailyCard.layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(6,12,6,0) }
+        val dTitle = TextView(this)
+        dTitle.text = "Daily Sales"
+        dTitle.textSize = 14f
+        dTitle.setTypeface(null, Typeface.BOLD)
+        dailyCard.addView(dTitle)
+
+        val barRow = LinearLayout(this)
+        barRow.orientation = LinearLayout.HORIZONTAL
+        barRow.gravity = Gravity.BOTTOM
+        barRow.setPadding(0,16,0,0)
+        var maxV = 1f
+        for(v in dailyMap.values){ if(v > maxV) maxV = v }
+        for(e in dailyMap.entries){
+            val col = LinearLayout(this)
+            col.orientation = LinearLayout.VERTICAL
+            col.gravity = Gravity.CENTER_HORIZONTAL
+            col.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+            val tvAmt = TextView(this)
+            tvAmt.text = dollar + e.value.toInt().toString()
+            tvAmt.textSize = 9f
+            tvAmt.gravity = Gravity.CENTER
+            col.addView(tvAmt)
+            val bar = View(this)
+            bar.setBackgroundColor(Color.parseColor("#2563EB"))
+            val h = (20 + (e.value / maxV * 80)).toInt()
+            bar.layoutParams = LinearLayout.LayoutParams(22, h).apply { setMargins(0,4,0,4) }
             col.addView(bar)
-            col.addView(TextView(this).apply{ text=d.first.takeLast(5); textSize=9f })
+            val tvDay = TextView(this)
+            tvDay.text = e.key.substring(5)
+            tvDay.textSize = 9f
+            col.addView(tvDay)
             barRow.addView(col)
         }
-        dailyCard.addView(barRow); midRow.addView(dailyCard)
+        dailyCard.addView(barRow)
+        content.addView(dailyCard)
 
-        val deptCard = LinearLayout(this).apply{ orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,0,6,0)} }
-        deptCard.addView(TextView(this).apply{ text="Profit by Department"; textSize=14f; setTypeface(null, android.graphics.Typeface.BOLD) })
+        val deptCard = LinearLayout(this)
+        deptCard.orientation = LinearLayout.VERTICAL
+        deptCard.setBackgroundColor(Color.WHITE)
+        deptCard.setPadding(16,16,16,16)
+        deptCard.layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(6,12,6,0) }
+        deptCard.addView(TextView(this).apply { text = "Profit by Department"; textSize = 14f; setTypeface(null, Typeface.BOLD) })
         deptCard.addView(PieView(this, deptMap))
-        var idx=0
-        for((dept,v) in deptMap){ val total=deptMap.values.sum(); val pct= if(total>0) (v/total*100).toInt() else 0
-            val row = LinearLayout(this).apply{ orientation=LinearLayout.HORIZONTAL; setPadding(0,4,0,4);
+        content.addView(deptCard)
+
+        val recentCard = LinearLayout(this)
+        recentCard.orientation = LinearLayout.VERTICAL
+        recentCard.setBackgroundColor(Color.WHITE)
+        recentCard.setPadding(16,16,16,16)
+        recentCard.layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(6,12,6,0) }
+        val rTitle = TextView(this)
+        rTitle.text = "Recent Transactions - REAL"
+        rTitle.textSize = 16f
+        rTitle.setTypeface(null, Typeface.BOLD)
+        recentCard.addView(rTitle)
+
+        val headRow = LinearLayout(this)
+        headRow.setBackgroundColor(Color.parseColor("#F8FAFC"))
+        headRow.setPadding(8,8,8,8)
+        fun head(s:String): TextView {
+            val t = TextView(this)
+            t.text = s
+            t.textSize = 12f
+            t.setTextColor(Color.GRAY)
+            t.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+            t.gravity = Gravity.CENTER
+            return t
+        }
+        headRow.addView(head("Date"))
+        headRow.addView(head("Sales"))
+        headRow.addView(head("Profit
