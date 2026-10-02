@@ -28,8 +28,11 @@
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
         <activity android:name=".BranchesActivity" android:exported="false" />
         <activity android:name=".StockTransferActivity" android:exported="false" />
-        <activity android:name=".PosLoginActivity" android:exported="true" />
+        <activity android:name=".PosLoginActivity" android:exported="false" />
         <activity android:name=".SalesActivity" android:exported="false" />
+        <activity android:name=".StockActivity" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
+
     </application>
 
 </manifest>
