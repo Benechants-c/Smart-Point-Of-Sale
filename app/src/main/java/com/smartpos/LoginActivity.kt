@@ -39,27 +39,34 @@ class LoginActivity : Activity() {
             val ownerPhone = ownerPref.getString("phone","")
             val ownerPass = ownerPref.getString("pass","1234")
 
-            // Owner login -> UsersActivity (Admin panel)
+            // Owner login -> ADMIN DASHBOARD (not UsersActivity)
             if((id==ownerEmail || id==ownerPhone || id=="admin") && pin==ownerPass){
                 Toast.makeText(this,"Owner Login OK!",Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, UsersActivity::class.java))
+                startActivity(Intent(this, AdminActivity::class.java))
+                finish()
                 return@setOnClickListener
             }
 
-            // Cashier/Manager login -> UsersActivity for now (replace with POS screen later)
+            // Cashier/Manager login -> check role
             val usersPref = getSharedPreferences("users_db", Context.MODE_PRIVATE)
-            var found=false
+            var foundRole = ""
             for((k,v) in usersPref.all){
                 if(!k.startsWith("user_")) continue
                 val parts=v.toString().split("|")
                 if(parts.size<3) continue
                 if(id.equals(parts[0],true) && pin==parts[1]){
-                    found=true; break
+                    foundRole = parts[2] // Cashier, Manager, Admin
+                    break
                 }
             }
-            if(found){
-                Toast.makeText(this,"$id Logged in!",Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, UsersActivity::class.java))
+            if(foundRole.isNotEmpty()){
+                Toast.makeText(this,"$id Logged in as $foundRole!",Toast.LENGTH_SHORT).show()
+                when(foundRole.lowercase()){
+                    "admin", "manager", "superadmin" -> startActivity(Intent(this, AdminActivity::class.java))
+                    "cashier" -> startActivity(Intent(this, SalesActivity::class.java))
+                    else -> startActivity(Intent(this, SalesActivity::class.java))
+                }
+                finish()
             } else Toast.makeText(this,"Wrong ID/PIN",Toast.LENGTH_SHORT).show()
         }
 
