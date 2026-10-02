@@ -21,6 +21,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ReportsActivity" android:exported="false" />
         <activity android:name=".AdminActivity" android:exported="false" />
         <activity android:name=".AuditLogActivity" android:exported="false" />
         <activity android:name=".AdminDetailActivity" android:exported="false" />
