@@ -1,4 +1,5 @@
 package com.smartpos
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -13,7 +14,9 @@ import android.view.KeyEvent
 import android.widget.*
 
 class SalesActivity : Activity() {
+
     data class CartItem(var name:String, var price:Float, var qty:Int, var code:String="")
+
     private val cart = mutableListOf<CartItem>()
     private lateinit var cartContainer: LinearLayout
     private lateinit var txtReceiptTotal: TextView
@@ -62,7 +65,7 @@ class SalesActivity : Activity() {
         root.addView(TextView(this).apply { text="CART"; textSize=15f; setTypeface(null,Typeface.BOLD); setPadding(16,8,16,4) })
         cartContainer = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
         root.addView(cartContainer)
-                val receiptCard = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(14,14,14,14); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,12,12,12)} }
+        val receiptCard = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(14,14,14,14); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,12,12,12)} }
         txtReceiptCount = TextView(this).apply { text="0 items"; textSize=12f }
         txtReceiptTotal = TextView(this).apply { text="TOTAL: $0.00"; textSize=18f; setTypeface(null,Typeface.BOLD) }
         val rRow = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
@@ -79,6 +82,7 @@ class SalesActivity : Activity() {
         inputTendered.addTextChangedListener(object:TextWatcher{ override fun afterTextChanged(s:Editable?){ updateTotals() } override fun beforeTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){} override fun onTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){} })
         refreshCart()
     }
+
     private fun loadShopsInto(container: LinearLayout){
         container.removeAllViews()
         val shops = mutableListOf("Main Shop")
@@ -87,32 +91,44 @@ class SalesActivity : Activity() {
         for(s in shops){ val rb = RadioButton(this); rb.text = s; rb.isChecked = (s == selectedShop); rb.setOnCheckedChangeListener { _, isChecked -> if(isChecked){ selectedShop = s; txtShopTop.text = "Shop: $selectedShop" } }; rg.addView(rb) }
         container.addView(rg)
     }
+
     private fun loadAllProducts(){
         allProducts.clear()
         try{ for(db in listOf("stock_main","products_db","products")){ val pref=getSharedPreferences(db, Context.MODE_PRIVATE); for((k,v) in pref.all){ val p=v.toString().split("|"); if(p.isEmpty()) continue; val name=p[0]; var price=p.getOrNull(2)?.toFloatOrNull()?: p.getOrNull(1)?.toFloatOrNull()?: 0f; val code=if(p.size>4) p[4] else k; if(name.isNotEmpty() && price>0) allProducts.add(Triple(code,name,price)) } } }catch(_:Exception){}
         if(allProducts.isEmpty()) allProducts.add(Triple("001","stove 4 plate",50f))
     }
+
     private fun quickAddProduct(){
         val q=inputQuick.text.toString().trim(); if(q.isEmpty()) return
         val found = allProducts.filter { it.first.equals(q,true) || it.second.contains(q,true) }
         if(found.isEmpty()){ Toast.makeText(this,"Not found: $q",Toast.LENGTH_SHORT).show(); return }
         if(found.size==1){ addToCart(found[0].second,found[0].third,found[0].first); inputQuick.setText("") } else { val items=found.map { "${it.first} | ${it.second} - $${it.third}" }.toTypedArray(); AlertDialog.Builder(this).setTitle("Found ${found.size}").setItems(items){_,w-> addToCart(found[w].second,found[w].third,found[w].first); inputQuick.setText("") }.show() }
     }
+
     private fun showProductPicker(){ val items=allProducts.map { "${it.first} | ${it.second} - $${it.third}" }.toTypedArray(); AlertDialog.Builder(this).setTitle("Products").setItems(items){_,w-> addToCart(allProducts[w].second,allProducts[w].third,allProducts[w].first) }.show() }
+
     private fun addToCart(name:String,price:Float,code:String=""){ val ex=cart.find { it.name.equals(name,true) }; if(ex!=null) ex.qty++ else cart.add(CartItem(name,price,1,code)); refreshCart() }
+
     private fun refreshCart(){
         cartContainer.removeAllViews()
-        for((i,it) in cart.withIndex()){
-            val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; setPadding(10,14,10,14) }
-            row.addView(TextView(this).apply { text="${i+1}"; layoutParams=LinearLayout.LayoutParams(30,-2) })
-            row.addView(TextView(this).apply { text=it.name; layoutParams=LinearLayout.LayoutParams(0,-2,1f); textSize=15f; setTypeface(null,Typeface.BOLD) })
+        for((index,cItem) in cart.withIndex()){
+            val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; setPadding(10,14,10,14); gravity=Gravity.CENTER_VERTICAL }
+            row.addView(TextView(this).apply { text="${index+1}"; layoutParams=LinearLayout.LayoutParams(30,-2) })
+            row.addView(TextView(this).apply { text=cItem.name; layoutParams=LinearLayout.LayoutParams(0,-2,1f); textSize=15f; setTypeface(null,Typeface.BOLD) })
             val qb=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; layoutParams=LinearLayout.LayoutParams(110,-2) }
-            qb.addView(Button(this).apply { text="-"; setBackgroundColor(Color.RED); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(40,80); setOnClickListener{ if(it.qty>1) it.qty-- else cart.remove(it); refreshCart() } })
-            qb.addView(TextView(this).apply { text=it.qty.toString(); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(30,-2) })
-            qb.addView(Button(this).apply { text="+"; setBackgroundColor(Color.parseColor("#22C55E")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(40,80); setOnClickListener{ it.qty++; refreshCart() } })
-            row.addView(qb); row.addView(TextView(this).apply { text="$${it.price*it.qty}"; layoutParams=LinearLayout.LayoutParams(80,-2); gravity=Gravity.END; setTypeface(null,Typeface.BOLD) }); cartContainer.addView(row)
-        }; updateTotals()
+            val btnMinus = Button(this).apply { text="-"; setBackgroundColor(Color.RED); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(40,80) }
+            btnMinus.setOnClickListener { if(cItem.qty>1) cItem.qty-- else cart.remove(cItem); refreshCart() }
+            val txtQ = TextView(this).apply { text=cItem.qty.toString(); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(30,-2) }
+            val btnPlus = Button(this).apply { text="+"; setBackgroundColor(Color.parseColor("#22C55E")); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(40,80) }
+            btnPlus.setOnClickListener { cItem.qty++; refreshCart() }
+            qb.addView(btnMinus); qb.addView(txtQ); qb.addView(btnPlus)
+            row.addView(qb)
+            row.addView(TextView(this).apply { text="$${cItem.price*cItem.qty}"; layoutParams=LinearLayout.LayoutParams(80,-2); gravity=Gravity.END; setTypeface(null,Typeface.BOLD) })
+            cartContainer.addView(row)
+        }
+        updateTotals()
     }
+
     private fun updateTotals(){ val total=cart.sumOf { (it.price*it.qty).toDouble() }.toFloat(); txtReceiptCount.text="${cart.sumOf { it.qty }} items"; txtReceiptTotal.text="TOTAL: $${String.format("%.2f",total)}"; val tend=inputTendered.text.toString().toFloatOrNull()?:0f; txtChange.text="CHANGE: $${String.format("%.2f",tend-total)}" }
     private fun completeSaleAndPrint(){
         val total=cart.sumOf { (it.price*it.qty).toDouble() }.toFloat(); if(cart.isEmpty()) return; val tend=inputTendered.text.toString().toFloatOrNull()?:0f; if(tend<total) return
