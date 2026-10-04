@@ -57,7 +57,7 @@ if(id.equals(p[0],true)&&pin==p[1]){foundRole=p[2];break}
 if(foundRole.isNotEmpty()){
 when(foundRole.lowercase()){
 "admin","manager","superadmin"->startActivity(Intent(this,AdminActivity::class.java))
-else->startActivity(Intent(this,SalesActivity::class.java)
+else->startActivity(Intent(this,SalesActivity::class.java))
 }
 finish()
 }else Toast.makeText(this,"Wrong ID/PIN",Toast.LENGTH_SHORT).show()
