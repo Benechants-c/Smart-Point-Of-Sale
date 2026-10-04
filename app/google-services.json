@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "635519087873",
+    "project_id": "smartpos-83781",
+    "storage_bucket": "smartpos-83781.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635519087873:android:20c513869c77bd5a971700",
+        "android_client_info": {
+          "package_name": "com.smartpos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbI-h3lJ5U8Bd2NNODcmw6LHNZDMcOB68"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
