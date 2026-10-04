@@ -16,16 +16,16 @@ class BranchesActivity : Activity() {
         super.onCreate(b)
         val root = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(10,10,10,10)}
         
-        // HEADER - FIXED TO BUILD 129 LICENSED
+        // HEADER - CLIENT SAFE BUILD 129
         val head = LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,10,12)}
         head.addView(TextView(this).apply{
-            text="BRANCHES / SHOPS - BUILD 129 LICENSED - ${LicenseManager.getStatusText(this@BranchesActivity)}"
-            setTextColor(Color.WHITE);textSize=11f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)
+            text="BRANCHES / SHOPS - BUILD 129"
+            setTextColor(Color.WHITE);textSize=13f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
         head.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#475569"));setTextColor(Color.WHITE);setOnClickListener{finish()}})
         root.addView(head)
 
-        // STATUS BAR WITH DAYS LEFT
+        // STATUS BAR - Shows trial days
         root.addView(TextView(this).apply{
             text = LicenseManager.getStatusText(this@BranchesActivity)
             setPadding(16,8,16,8);setBackgroundColor(Color.parseColor("#F1F5F9"))
@@ -36,22 +36,24 @@ class BranchesActivity : Activity() {
         listLayout = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(0,10,0,10)}
         root.addView(listLayout)
         
+        // CLIENT BUTTONS ONLY - NO SUPER ADMIN
         root.addView(Button(this).apply{
             text="ADD BRANCH / SHOP";setBackgroundColor(Color.parseColor("#2563EB"));setTextColor(Color.WHITE)
             setOnClickListener{ 
-                // LICENSE CHECK
                 val max = LicenseManager.getMaxBranches(this@BranchesActivity)
                 val count = getShopsPrefs().all.size
                 if(count >= max){
-                    Toast.makeText(this@BranchesActivity,"❌ LIMIT REACHED! Max $max branches\n${LicenseManager.getStatusText(this@BranchesActivity)}\nActivate license",Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@BranchesActivity,"❌ LIMIT REACHED! Max $max branches\nContact developer for license code",Toast.LENGTH_LONG).show()
+                    // Go to activation screen (NOT super admin)
                     startActivity(Intent(this@BranchesActivity, ManageShopsActivity::class.java))
                     return@setOnClickListener
                 }
                 showAddDialog() 
             }
         })
+        // CLIENT CAN ACTIVATE LICENSE (not super admin)
         root.addView(Button(this).apply{
-            text="🔑 ACTIVATE LICENSE";setBackgroundColor(Color.parseColor("#16A34A"));setTextColor(Color.WHITE)
+            text="🔑 ACTIVATE LICENSE CODE";setBackgroundColor(Color.parseColor("#16A34A"));setTextColor(Color.WHITE)
             setOnClickListener{startActivity(Intent(this@BranchesActivity, ManageShopsActivity::class.java))}
         })
         root.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#E5E7EB"));setOnClickListener{finish()}})
@@ -65,7 +67,7 @@ class BranchesActivity : Activity() {
         listLayout.removeAllViews()
         val prefs = getShopsPrefs(); val all = prefs.all
         if(all.isEmpty()){
-            listLayout.addView(TextView(this).apply{text="No branches/shops yet. Click ADD BRANCH / SHOP above and SAVE.";setPadding(20,20,20,20);setTextColor(Color.GRAY);gravity=Gravity.CENTER}); return
+            listLayout.addView(TextView(this).apply{text="No branches/shops yet.\nClick ADD BRANCH / SHOP above.";setPadding(20,20,20,20);setTextColor(Color.GRAY);gravity=Gravity.CENTER}); return
         }
         all.forEach{(id,value)->
             try{
@@ -97,24 +99,23 @@ class BranchesActivity : Activity() {
         val phoneInput = EditText(this).apply{hint="Phone for Receipt e.g. 077...";setText(existing?.optString("phone","")?:"");setTextColor(Color.BLACK)}
         val footerInput = EditText(this).apply{hint="Receipt Footer e.g. Thank you!";setText(existing?.optString("footer","")?:"");setTextColor(Color.BLACK)}
         
-        dlgLayout.addView(TextView(this).apply{text="Shop ID * (no spaces)";setTypeface(null,Typeface.BOLD)}); dlgLayout.addView(idInput)
+        dlgLayout.addView(TextView(this).apply{text="Shop ID *";setTypeface(null,Typeface.BOLD)}); dlgLayout.addView(idInput)
         dlgLayout.addView(TextView(this).apply{text="Shop Name *";setTypeface(null,Typeface.BOLD);setPadding(0,10,0,0)}); dlgLayout.addView(nameInput)
         dlgLayout.addView(TextView(this).apply{text="Location";setTypeface(null,Typeface.BOLD);setPadding(0,10,0,0)}); dlgLayout.addView(locInput)
-        dlgLayout.addView(TextView(this).apply{text="Phone for Receipt *";setTypeface(null,Typeface.BOLD);setPadding(0,10,0,0)}); dlgLayout.addView(phoneInput)
+        dlgLayout.addView(TextView(this).apply{text="Phone for Receipt";setTypeface(null,Typeface.BOLD);setPadding(0,10,0,0)}); dlgLayout.addView(phoneInput)
         dlgLayout.addView(TextView(this).apply{text="Receipt Footer";setTypeface(null,Typeface.BOLD);setPadding(0,10,0,0)}); dlgLayout.addView(footerInput)
         
-        android.app.AlertDialog.Builder(this).setTitle(if(isEdit)"Edit Branch/Shop" else "Add Branch/Shop - BUILD 129 LICENSED").setView(dlgLayout)
+        android.app.AlertDialog.Builder(this).setTitle(if(isEdit)"Edit Shop" else "Add Shop").setView(dlgLayout)
            .setPositiveButton(if(isEdit)"UPDATE" else "SAVE"){_,_->
                 val sid = idInput.text.toString().trim().lowercase().replace(" ","_"); val sname = nameInput.text.toString().trim(); val sloc = locInput.text.toString().trim(); val sphone = phoneInput.text.toString().trim(); val sfooter = footerInput.text.toString().trim()
                 if(sid.isEmpty() || sname.isEmpty()){ Toast.makeText(this,"ID and Name REQUIRED!",Toast.LENGTH_LONG).show(); return@setPositiveButton }
                 try{
                     val j = JSONObject(); j.put("id", sid); j.put("name", sname); j.put("location", sloc); j.put("phone", sphone); j.put("footer", sfooter)
                     getShopsPrefs().edit().putString(sid, j.toString()).apply()
-                    // Also save phone for receipt in shop_owner
                     if(sphone.isNotEmpty()){
                         getSharedPreferences("shop_owner", Context.MODE_PRIVATE).edit().putString("phone", sphone).apply()
                     }
-                    Toast.makeText(this,"✅ Branch $sid ${if(isEdit)"UPDATED" else "SAVED"}!",Toast.LENGTH_LONG).show(); refreshList()
+                    Toast.makeText(this,"✅ $sid SAVED!",Toast.LENGTH_LONG).show(); refreshList()
                 }catch(e:Exception){ Toast.makeText(this,"Error: ${e.message}",Toast.LENGTH_LONG).show() }
             }.setNegativeButton("CANCEL",null).show()
     }
