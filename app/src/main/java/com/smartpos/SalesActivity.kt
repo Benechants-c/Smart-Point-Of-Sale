@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -33,6 +32,7 @@ class SalesActivity : Activity() {
     private val depts = mutableListOf<String>()
     private var cashierName = "Cashier"
     private var lastReceiptText = ""
+    private var btSocket: android.bluetooth.BluetoothSocket? = null
 
     private fun getShopId(): String = if (spinnerShop.selectedItemPosition in shops.indices) shops[spinnerShop.selectedItemPosition].first else "main"
 
@@ -53,6 +53,40 @@ class SalesActivity : Activity() {
         if(tendered==0.0) changeView.text="CHANGE: $0.00"
         else if(change<0) changeView.text="NEED $${String.format("%.2f",-change)}"
         else changeView.text="CHANGE: $${String.format("%.2f",change)}"
+    }
+
+    // ===== DIRECT BLUETOOTH PRINT - WORKS FOR ALL PRINTER TYPES =====
+    private fun printDirect(text: String){
+        try{
+            val btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            if(btAdapter==null){ Toast.makeText(this,"No Bluetooth",Toast.LENGTH_SHORT).show(); return }
+            if(!btAdapter.isEnabled){ Toast.makeText(this,"Enable Bluetooth in settings",Toast.LENGTH_SHORT).show(); return }
+            val paired = btAdapter.bondedDevices.toList()
+            if(paired.isEmpty()){ Toast.makeText(this,"No paired printer. Pair in phone Settings > Bluetooth first",Toast.LENGTH_LONG).show(); return }
+            if(paired.size>1){
+                val names = paired.map{ "${it.name} - ${it.address}" }.toTypedArray()
+                AlertDialog.Builder(this).setTitle("Select Printer").setItems(names){_,which-> doPrint(paired[which], text) }.show()
+            } else { doPrint(paired[0], text) }
+        }catch(e:Exception){ Toast.makeText(this,"Print error: ${e.message}",Toast.LENGTH_LONG).show() }
+    }
+    private fun doPrint(device: android.bluetooth.BluetoothDevice, text: String){
+        Thread{
+            try{
+                btSocket?.close()
+                val uuid = device.uuids?.firstOrNull()?.uuid?: java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                btSocket = device.createRfcommSocketToServiceRecord(uuid)
+                btSocket?.connect()
+                val out = btSocket?.outputStream
+                out?.write(text.toByteArray())
+                out?.write("\n\n\n".toByteArray())
+                out?.flush()
+                Thread.sleep(600)
+                btSocket?.close()
+                runOnUiThread{ Toast.makeText(this,"✅ Printed to ${device.name}",Toast.LENGTH_SHORT).show() }
+            }catch(e:Exception){
+                runOnUiThread{ Toast.makeText(this,"Failed: ${e.message}",Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     private fun loadRealStock(){
@@ -140,9 +174,7 @@ class SalesActivity : Activity() {
             getSharedPreferences("sales_main", Context.MODE_PRIVATE).edit().putString(key, saleVal).apply()
             val itemsPref = getSharedPreferences("sale_items_$key", Context.MODE_PRIVATE)
             val edit = itemsPref.edit()
-            for(item in cart){
-                edit.putString(item.product.code, "${item.product.name}|${item.qty}|${item.product.sell}|${item.product.dept}|${item.product.cost}|${item.product.code}")
-            }
+            for(item in cart){ edit.putString(item.product.code, "${item.product.name}|${item.qty}|${item.product.sell}|${item.product.dept}|${item.product.cost}|${item.product.code}") }
             edit.apply()
             val catPref = getSharedPreferences("sales_category", Context.MODE_PRIVATE)
             val catEdit = catPref.edit()
@@ -156,7 +188,6 @@ class SalesActivity : Activity() {
             }
             catEdit.apply()
 
-            // DYNAMIC RECEIPT WITH SHOP DETAILS - NO RECODE NEEDED
             val details = getShopDetails(shopId)
             val shopName = details.getOrNull(0)?.ifEmpty { "Main Shop" }?: "Main Shop"
             val shopAddr = details.getOrNull(1)?: ""
@@ -164,7 +195,8 @@ class SalesActivity : Activity() {
             val shopTin = details.getOrNull(3)?: ""
             val shopFooter = details.getOrNull(4)?.ifEmpty { "Thank you!" }?: "Thank you!"
 
-            val is58mm = true // false for 80mm big printer
+            val posPref = getSharedPreferences("pos", Context.MODE_PRIVATE)
+            val is58mm = posPref.getBoolean("printer_58mm", true)
             val sep = if(is58mm) "--------------------------------" else "------------------------------------------------"
             val sb = StringBuilder()
             sb.append(" ${shopName.uppercase()}\n")
@@ -193,7 +225,7 @@ class SalesActivity : Activity() {
             sb.append(" Powered by SmartPOS\n\n\n")
 
             lastReceiptText = sb.toString()
-            getSharedPreferences("pos", Context.MODE_PRIVATE).edit().putString("last_receipt",lastReceiptText).apply()
+            posPref.edit().putString("last_receipt",lastReceiptText).apply()
         }catch(_:Exception){}
         showReceiptPopup(total, tendered)
     }
@@ -202,24 +234,17 @@ class SalesActivity : Activity() {
         val dialogView = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(40,30,40,30); setBackgroundColor(Color.WHITE) }
         dialogView.addView(TextView(this).apply { text="✅ Receipt Ready!"; textSize=18f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setPadding(0,0,0,12) })
         dialogView.addView(TextView(this).apply { text="Cashier: $cashierName\nTOTAL: $${String.format("%.2f",total)} | CHANGE: $${String.format("%.2f",tendered-total)}"; textSize=13f; gravity=Gravity.CENTER; setPadding(0,0,0,20) })
-        val btnPrint = Button(this).apply { text="🖨️ PRINT RECEIPT"; setBackgroundColor(Color.parseColor("#1D4ED8")); setTextColor(Color.WHITE); setOnClickListener{
-            try{ val i=Intent(Intent.ACTION_SEND); i.type="text/plain"; i.putExtra(Intent.EXTRA_TEXT,lastReceiptText); startActivity(Intent.createChooser(i,"Print Receipt")) }catch(_:Exception){}
-        }}
-        val btnReprint = Button(this).apply { text="🔄 REPRINT LAST RECEIPT"; setOnClickListener{
-            try{ val i=Intent(Intent.ACTION_SEND); i.type="text/plain"; i.putExtra(Intent.EXTRA_TEXT,lastReceiptText); startActivity(Intent.createChooser(i,"Reprint Receipt")) }catch(_:Exception){}
-        }}
+        val btnPrint = Button(this).apply { text="🖨️ PRINT DIRECT"; setBackgroundColor(Color.parseColor("#1D4ED8")); setTextColor(Color.WHITE); setOnClickListener{ printDirect(lastReceiptText) }}
+        val btnReprint = Button(this).apply { text="🔄 REPRINT LAST"; setBackgroundColor(Color.parseColor("#334155")); setTextColor(Color.WHITE); setOnClickListener{ printDirect(lastReceiptText) }}
         val btnNew = Button(this).apply { text="➕ NEW SALE"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
         dialogView.addView(btnPrint); dialogView.addView(btnReprint); dialogView.addView(btnNew)
         val dialog = AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create()
-        btnNew.setOnClickListener{
-            cart.clear(); tenderedInput.setText(""); refreshCart(); loadRealStock(); dialog.dismiss()
-        }
+        btnNew.setOnClickListener{ cart.clear(); tenderedInput.setText(""); refreshCart(); loadRealStock(); dialog.dismiss() }
         dialog.show()
     }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        // REMOVE JOHN - GET REAL CASHIER
         var realName = intent.getStringExtra("USER_NAME")?: intent.getStringExtra("USER")?: ""
         if(realName.isEmpty() || realName.equals("John", true)){
             realName = getSharedPreferences("pos", Context.MODE_PRIVATE).getString("last_user","")?: ""
@@ -232,15 +257,12 @@ class SalesActivity : Activity() {
                 val pref = getSharedPreferences("users_db", Context.MODE_PRIVATE)
                 for((_,v) in pref.all){
                     val parts = v.toString().split("|")
-                    if(parts.isNotEmpty() && parts[0].length>2 &&!parts[0].equals("John", true)){
-                        realName = parts[0]; break
-                    }
+                    if(parts.isNotEmpty() && parts[0].length>2 &&!parts[0].equals("John", true)){ realName = parts[0]; break }
                 }
             }catch(_:Exception){}
         }
         cashierName = if(realName.isEmpty() || realName.equals("John", true)) "Cashier" else realName
 
-        // LOAD SHOPS WITH NAME PARSING
         try{
             val ps=getSharedPreferences("shops_db",Context.MODE_PRIVATE)
             for((id,raw) in ps.all){
@@ -252,10 +274,27 @@ class SalesActivity : Activity() {
         if(shops.isEmpty()) shops.add(Pair("main","Main Shop"))
 
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setPadding(8,8,8,8); setBackgroundColor(Color.parseColor("#F1F5F9"))}
-
-        // DATE AND TIME NEXT TO CASHIER
         val phoneDateTime = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
         root.addView(TextView(this).apply{text="POS Sales - Cashier: $cashierName | $phoneDateTime"; textSize=15f; setTypeface(null,Typeface.BOLD); setPadding(8,8,8,8)})
+
+        // PRINTER TYPE SWITCHER - CHANGE ANYTIME
+        val posPref = getSharedPreferences("pos", Context.MODE_PRIVATE)
+        val current58 = posPref.getBoolean("printer_58mm", true)
+        val btnPrinter = Button(this).apply{
+            text="🖨️ PRINTER: ${if(current58) "58mm (Small)" else "80mm (Big)"} - TAP TO CHANGE"
+            setBackgroundColor(Color.parseColor("#334155")); setTextColor(Color.WHITE); textSize=11f
+            layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,6)}
+            setOnClickListener{
+                AlertDialog.Builder(this@SalesActivity).setTitle("Select Printer Type")
+                   .setItems(arrayOf("58mm - Small Mobile Printer (32 chars)", "80mm - Big Supermarket Printer (48 chars)")){_,which->
+                        val newIs58 = which==0
+                        posPref.edit().putBoolean("printer_58mm", newIs58).apply()
+                        Toast.makeText(this@SalesActivity,"✅ Printer set to ${if(newIs58) "58mm" else "80mm"}",Toast.LENGTH_LONG).show()
+                        this.text="🖨️ PRINTER: ${if(newIs58) "58mm (Small)" else "80mm (Big)"} - TAP TO CHANGE"
+                    }.show()
+            }
+        }
+        root.addView(btnPrinter)
 
         fun label(t:String)=TextView(this).apply{text=t; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#1E293B")); setPadding(12,6,12,6)}
         root.addView(label("SELECT SHOP"))
@@ -265,17 +304,21 @@ class SalesActivity : Activity() {
         root.addView(label("CART - Use - / +"))
         cartLayout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)}
         val scroll=ScrollView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,0,1f); addView(cartLayout)}; root.addView(scroll)
+
+        // FIXED BOTTOM BAR - ALWAYS VISIBLE
+        val bottomBar = LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(4,4,4,4) }
         val receiptRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(12,10,12,10); setBackgroundColor(Color.parseColor("#E2E0F0"))}
         receiptView=TextView(this).apply{text="RECEIPT: 0 items"; setTypeface(null,Typeface.BOLD); textSize=12f; layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
-        // TOTAL BLUE
         totalView=TextView(this).apply{text="TOTAL: $0.00"; setTypeface(null,Typeface.BOLD); textSize=16f; gravity=Gravity.END; setTextColor(Color.parseColor("#1D4ED8")); layoutParams=LinearLayout.LayoutParams(0,-2,1f)}
-        receiptRow.addView(receiptView); receiptRow.addView(totalView); root.addView(receiptRow)
+        receiptRow.addView(receiptView); receiptRow.addView(totalView); bottomBar.addView(receiptRow)
         val tenderRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL; setPadding(8,6,8,6); setBackgroundColor(Color.WHITE)}
         tenderRow.addView(TextView(this).apply{text="TENDERED $:"; setTypeface(null,Typeface.BOLD); textSize=12f})
-        tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(-1,-2,1f).apply{setMargins(8,0,0,0)}; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,8,12,8)}; tenderRow.addView(tenderedInput); root.addView(tenderRow)
+        tenderedInput=EditText(this).apply{hint="0.00"; inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; layoutParams=LinearLayout.LayoutParams(-1,-2,1f).apply{setMargins(8,0,0,0)}; setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(12,8,12,8)}; tenderRow.addView(tenderedInput); bottomBar.addView(tenderRow)
         changeView=TextView(this).apply{text="CHANGE: $0.00"; setBackgroundColor(Color.parseColor("#FEF3C7")); setPadding(12,16,12,16); setTypeface(null,Typeface.BOLD); textSize=18f; setTextColor(Color.parseColor("#16A34A")); gravity=Gravity.CENTER}
-        root.addView(changeView)
-        root.addView(Button(this).apply{text="COMPLETE SALE"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
+        bottomBar.addView(changeView)
+        bottomBar.addView(Button(this).apply{text="✅ COMPLETE SALE & PRINT"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE); setPadding(0,16,0,16); textSize=16f; setTypeface(null,Typeface.BOLD); setOnClickListener{completeSale()}})
+        root.addView(bottomBar)
+
         spinnerShop.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{override fun onItemSelected(a:AdapterView<*>?,v:View?,p:Int,i:Long){loadRealStock()} override fun onNothingSelected(a:AdapterView<*>?){}}
         setContentView(root); loadRealStock()
         tenderedInput.addTextChangedListener(object:TextWatcher{override fun afterTextChanged(s:Editable?){calcChange()} override fun beforeTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){} override fun onTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){}})
