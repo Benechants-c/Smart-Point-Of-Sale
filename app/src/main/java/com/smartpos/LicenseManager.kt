@@ -2,18 +2,13 @@ package com.smartpos
 
 import android.content.Context
 
-// WRAPPER - Fixes build errors! Uses new Firebase system inside
 object LicenseManager {
     
     fun isActivated(context: Context): Boolean {
         return FirebaseLicenseManager.isActivated(context)
     }
     
-    fun isLicenseValid(context: Context): Boolean {
-        return FirebaseLicenseManager.isActivated(context)
-    }
-    
-    fun checkLicense(context: Context): Boolean {
+    fun canUseApp(context: Context): Boolean {
         return FirebaseLicenseManager.isActivated(context)
     }
     
@@ -21,18 +16,23 @@ object LicenseManager {
         return FirebaseLicenseManager.getDaysLeft(context)
     }
     
-    fun getExpiryDate(context: Context): Long {
-        return context.getSharedPreferences("license", Context.MODE_PRIVATE).getLong("expiry", 0L)
+    fun getStatusText(context: Context): String {
+        if (!isActivated(context)) {
+            return "Trial Expired - Please Activate"
+        }
+        val days = getDaysLeft(context)
+        return when {
+            days <= 0 -> "Expired - Renew now"
+            days == 1L -> "Expires tomorrow!"
+            days <= 3L -> "Expires in $days days"
+            else -> "Active - $days days left"
+        }
     }
     
-    fun isExpired(context: Context): Boolean {
-        return !isActivated(context)
-    }
-    
-    // For old code that had license type checks
-    fun getLicenseType(context: Context): String {
-        return "30-DAY"
-    }
+    fun isLicenseValid(context: Context): Boolean = isActivated(context)
+    fun checkLicense(context: Context): Boolean = isActivated(context)
+    fun isExpired(context: Context): Boolean = !isActivated(context)
+    fun getLicenseType(context: Context): String = "30-DAY"
     
     fun validateLicense(context: Context, code: String, callback: (Boolean, String)->Unit) {
         FirebaseLicenseManager.verifyLicense(context, code, callback)
