@@ -1,1 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Bluetooth Receipt Printer -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="SMART POS"
+        android:theme="@android:style/Theme.Light.NoTitleBar">
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".AdminActivity" android:exported="false" />
+        <activity android:name=".AdminDetailActivity" android:exported="false" />
+        <activity android:name=".AuditLogActivity" android:exported="false" />
+        <activity android:name=".BranchesActivity" android:exported="false" />
+        <activity android:name=".ManageShopsActivity" android:exported="false" />
+        <activity android:name=".PosLoginActivity" android:exported="false" />
+        <activity android:name=".ReceiveStockActivity" android:exported="false" />
+        <activity android:name=".ReportsActivity" android:exported="false" />
+        <activity android:name=".SalesActivity" android:exported="false" />
+        <activity android:name=".StockPurchasingActivity" android:exported="false" />
+        <activity android:name=".StockTransferActivity" android:exported="false" />
+        <activity android:name=".UsersActivity" android:exported="false" />
+
+    </application>
+</manifest>
