@@ -10,7 +10,7 @@ object LicenseManager {
     private const val CONTACT = "+263773996805"
     private const val TAG = "LICENSE"
     private const val PREFS = "license"
-    private const val DB_URL = "https://smartpos-83781-default-rtdb.firebaseio.com"
+    private const val DB_URL = "https://smartpos-83781-default-rtdb.firebasedatabase.app"
     
     private fun getDb(context: Context): DatabaseReference {
         if (FirebaseApp.getApps(context).isEmpty()) {
@@ -73,7 +73,7 @@ object LicenseManager {
         }
         
         val deviceId = getDeviceId(c)
-        Log.i(TAG, "Verifying $cleanCode device $deviceId")
+        Log.i(TAG, "Verifying $cleanCode device $deviceId at $DB_URL")
 
         try {
             getDb(c).child("licenses").child(cleanCode).addListenerForSingleValueEvent(object : ValueEventListener {
