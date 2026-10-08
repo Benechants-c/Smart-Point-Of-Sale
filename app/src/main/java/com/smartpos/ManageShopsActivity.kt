@@ -16,7 +16,7 @@ super.onCreate(b)
 val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.parseColor("#F1F5F9"))}
 
 val topBar=LinearLayout(this).apply{setBackgroundColor(Color.parseColor("#1E293B"));setPadding(30,50,30,20);orientation=LinearLayout.VERTICAL}
-topBar.addView(TextView(this).apply{text="🏪 Manage Shops - BUILD 130";textSize=18f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE)})
+topBar.addView(TextView(this).apply{text="🏪 Manage Shops - BUILD 363 FIXED URL";textSize=18f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE)})
 txtStatus=TextView(this).apply{text=LicenseManager.getStatusText(this@ManageShopsActivity);setTextColor(Color.parseColor("#38BDF8"));textSize=13f}
 topBar.addView(txtStatus)
 root.addView(topBar)
@@ -51,8 +51,6 @@ renderShops()
 btnActivate.setOnClickListener{
 val code=edCode.text.toString().trim().uppercase()
 if(code.isEmpty()){Toast.makeText(this,"Enter code",Toast.LENGTH_SHORT).show();return@setOnClickListener}
-
-// FIXED FOR BUILD 130 - USE ASYNC FIREBASE CHECK
 Toast.makeText(this,"⏳ Checking $code online...",Toast.LENGTH_SHORT).show()
 btnActivate.isEnabled = false
 btnActivate.text = "⏳ CHECKING..."
