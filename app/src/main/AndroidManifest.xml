@@ -1,18 +1,13 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
-        android:label="SMART POS"
-        android:theme="@android:style/Theme.Light.NoTitleBar">
+        android:label="SMART POS">
 
         <activity
             android:name=".LoginActivity"
@@ -37,4 +32,5 @@
         <activity android:name=".UsersActivity" android:exported="false" />
 
     </application>
+
 </manifest>
