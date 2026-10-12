@@ -16,10 +16,10 @@ class BranchesActivity : Activity() {
         super.onCreate(b)
         val root = LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.WHITE);setPadding(10,10,10,10)}
         
-        // HEADER - CLIENT SAFE BUILD 129
+        // HEADER - CLIENT SAFE BUILD 130
         val head = LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(Color.parseColor("#1E293B"));setPadding(16,12,10,12)}
         head.addView(TextView(this).apply{
-            text="BRANCHES / SHOPS - BUILD 129"
+            text="BRANCHES / SHOPS - BUILD 130"
             setTextColor(Color.WHITE);textSize=13f;setTypeface(null,Typeface.BOLD);layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
         head.addView(Button(this).apply{text="BACK";setBackgroundColor(Color.parseColor("#475569"));setTextColor(Color.WHITE);setOnClickListener{finish()}})
@@ -43,15 +43,15 @@ class BranchesActivity : Activity() {
                 val max = LicenseManager.getMaxBranches(this@BranchesActivity)
                 val count = getShopsPrefs().all.size
                 if(count >= max){
-                    Toast.makeText(this@BranchesActivity,"❌ LIMIT REACHED! Max $max branches\nContact developer for license code",Toast.LENGTH_LONG).show()
-                    // Go to activation screen (NOT super admin)
+                    Toast.makeText(this@BranchesActivity,"❌ LIMIT REACHED! Max $max branches\nContact +263773996805 for upgrade",Toast.LENGTH_LONG).show()
+                    // Go to activation screen
                     startActivity(Intent(this@BranchesActivity, ManageShopsActivity::class.java))
                     return@setOnClickListener
                 }
                 showAddDialog() 
             }
         })
-        // CLIENT CAN ACTIVATE LICENSE (not super admin)
+        // CLIENT CAN ACTIVATE LICENSE
         root.addView(Button(this).apply{
             text="🔑 ACTIVATE LICENSE CODE";setBackgroundColor(Color.parseColor("#16A34A"));setTextColor(Color.WHITE)
             setOnClickListener{startActivity(Intent(this@BranchesActivity, ManageShopsActivity::class.java))}
@@ -109,6 +109,21 @@ class BranchesActivity : Activity() {
            .setPositiveButton(if(isEdit)"UPDATE" else "SAVE"){_,_->
                 val sid = idInput.text.toString().trim().lowercase().replace(" ","_"); val sname = nameInput.text.toString().trim(); val sloc = locInput.text.toString().trim(); val sphone = phoneInput.text.toString().trim(); val sfooter = footerInput.text.toString().trim()
                 if(sid.isEmpty() || sname.isEmpty()){ Toast.makeText(this,"ID and Name REQUIRED!",Toast.LENGTH_LONG).show(); return@setPositiveButton }
+                
+                // FIX: Prevent duplicate ID on new add
+                if(!isEdit && getShopsPrefs().contains(sid)){
+                    Toast.makeText(this,"❌ ID already exists! Use EDIT",Toast.LENGTH_LONG).show(); return@setPositiveButton
+                }
+                
+                // FIX: Double check branch limit before save
+                if(!isEdit){
+                    val max = LicenseManager.getMaxBranches(this)
+                    val count = getShopsPrefs().all.size
+                    if(count >= max){
+                        Toast.makeText(this,"❌ LIMIT REACHED! Max $max branches",Toast.LENGTH_LONG).show(); return@setPositiveButton
+                    }
+                }
+
                 try{
                     val j = JSONObject(); j.put("id", sid); j.put("name", sname); j.put("location", sloc); j.put("phone", sphone); j.put("footer", sfooter)
                     getShopsPrefs().edit().putString(sid, j.toString()).apply()
