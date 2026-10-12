@@ -1,108 +1,66 @@
 package com.smartpos
-
 import android.content.Context
-import android.provider.Settings
-import android.util.Log
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
 
 object LicenseManager {
-    private const val CONTACT = "+263773996805"
-    private const val TAG = "LICENSE"
-    private const val PREFS = "license"
-    // ✅ TELONE-PROOF - Cloudflare Worker, not Firebase directly
-    private const val WORKER_URL = "https://smartpo-licensess.benchatewa.workers.dev"
-    
-    private fun getDeviceId(c: Context): String = Settings.Secure.getString(c.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown"
-    private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    fun isActivated(c: Context): Boolean { val p=prefs(c); return p.getBoolean("valid",false) && p.getLong("expiry",0L) > System.currentTimeMillis() }
-    fun getDaysLeft(c: Context): Int { val d=prefs(c).getLong("expiry",0L)-System.currentTimeMillis(); return if(d<=0)0 else (d/86400000L).toInt()+1 }
-    fun getStatusText(c: Context): String = if(!isActivated(c)) "❌ EXPIRED!\nContact: $CONTACT" else "✅ Active - ${getDaysLeft(c)} days"
-    fun getMaxBranches(c: Context): Int = if(isActivated(c)) 100 else 0
-    fun getLicenseCode(c: Context): String = prefs(c).getString("code","")?:""
-    fun saveLicense(c: Context, code: String, expiry: Long) { prefs(c).edit().putString("code",code).putLong("expiry",expiry).putBoolean("valid",true).apply(); Log.i(TAG,"Saved $code") }
-    private fun parseLong(v: Any?): Long = when(v){ is Number -> v.toLong(); is String -> v.toLongOrNull()?:0L; else -> 0L }
 
-    fun verifyLicense(c: Context, code: String, cb: (Boolean, String) -> Unit) {
-        val clean = code.trim().uppercase()
-        if(clean.isBlank()){ cb(false,"Enter code!"); return }
-        httpVerify(c, clean, getDeviceId(c), cb)
+    private const val PREFS = "license_prefs"
+    private const val WORKER_URL = "https://smartpo-licensess.benchatewa-workflows-5d9.workers.dev"
+    // ^^^ REPLACE with YOUR actual Worker URL if different!
+
+    fun isLicenseValid(ctx: Context): Boolean {
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val expiry = p.getLong("expiry_time", 0L)
+        return expiry > System.currentTimeMillis()
     }
 
-    private fun httpVerify(c: Context, code:String, deviceId:String, cb:(Boolean,String)->Unit){
-        Thread{
-            try{
-                val url = java.net.URL("$WORKER_URL/$code")
-                Log.i(TAG,"Checking $url")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout=10000; conn.readTimeout=10000
-                conn.setRequestProperty("Cache-Control","no-cache")
-                val responseCode = conn.responseCode
-                val txt = if(responseCode==200) conn.inputStream.bufferedReader().readText() else conn.errorStream?.bufferedReader()?.readText() ?: ""
-                Log.i(TAG,"HTTP $responseCode: $txt")
-                
-                if(responseCode==404 || txt.contains("not found") || txt.trim()=="null"){
-                    android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"❌ Invalid code $code! Contact: $CONTACT") }
-                    return@Thread
+    fun getStatusText(ctx: Context): String {
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val expiry = p.getLong("expiry_time", 0L)
+        val max = p.getInt("max_branches", 1)
+        val shops = ctx.getSharedPreferences("shops_db", Context.MODE_PRIVATE).all.size
+        if (expiry == 0L) return "❌ NO LICENSE - Activate"
+        if (expiry < System.currentTimeMillis()) return "❌ EXPIRED! $shops/$max shops"
+        val days = (expiry - System.currentTimeMillis()) / (1000 * 60 * 60 * 24)
+        return "✅ VALID: ${days+1} days left | $shops/$max shops"
+    }
+
+    fun getMaxBranches(ctx: Context): Int {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt("max_branches", 1)
+    }
+
+    fun verifyLicense(ctx: Context, code: String, cb: (Boolean, String) -> Unit) {
+        Executors.newSingleThreadExecutor().execute {
+            try {
+                val url = URL("$WORKER_URL?code=$code")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 15000
+                conn.readTimeout = 15000
+                val response = conn.inputStream.bufferedReader().readText()
+                val json = JSONObject(response)
+
+                if (json.optBoolean("valid", false)) {
+                    val days = json.optInt("days", 30)
+                    val branches = json.optInt("branches", 5)
+                    val expiry = System.currentTimeMillis() + days * 24L * 60 * 60 * 1000
+
+                    ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putLong("expiry_time", expiry)
+                        .putInt("max_branches", branches)
+                        .putString("license_code", code)
+                        .apply()
+
+                    cb(true, "✅ Welcome! $days days activated | Max $branches branches")
+                } else {
+                    cb(false, "❌ Invalid code: ${json.optString("message","Invalid")}")
                 }
-                
-                val json = JSONObject(txt)
-                val days = json.optLong("days", 0L)
-                val name = json.optString("customerName","Customer")
-                var expiry = json.optLong("expiry",0L)
-                val used = json.optBoolean("used",false)
-                val bound = json.optString("deviceId","")
-                
-                if(expiry==0L && days>0){
-                    expiry = System.currentTimeMillis() + days*86400000L
-                }
-                if(expiry==0L){
-                    android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"No expiry set") }
-                    return@Thread
-                }
-                if(System.currentTimeMillis()>expiry){
-                    android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"❌ EXPIRED! Contact: $CONTACT") }
-                    return@Thread
-                }
-                if(used && bound.isNotEmpty() && bound!=deviceId && !code.startsWith("TEST-")){
-                    android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"❌ Used on another phone! $CONTACT") }
-                    return@Thread
-                }
-                
-                // Activate - PUT back via Worker
-                try{
-                    val update = JSONObject()
-                    update.put("days", days)
-                    update.put("customerName", name)
-                    update.put("deviceId", deviceId)
-                    update.put("used", true)
-                    update.put("activatedAt", System.currentTimeMillis())
-                    update.put("expiry", expiry)
-                    
-                    val putConn = java.net.URL("$WORKER_URL/$code").openConnection() as java.net.HttpURLConnection
-                    putConn.requestMethod="PUT"
-                    putConn.doOutput=true
-                    putConn.setRequestProperty("Content-Type","application/json")
-                    putConn.connectTimeout=10000
-                    putConn.outputStream.write(update.toString().toByteArray())
-                    val putCode = putConn.responseCode
-                    Log.i(TAG,"Activate PUT $putCode")
-                    putConn.inputStream.close()
-                }catch(e:Exception){ Log.e(TAG,"Activate write failed",e) }
-                
-                android.os.Handler(android.os.Looper.getMainLooper()).post{
-                    saveLicense(c, code, expiry)
-                    cb(true,"✅ Welcome $name! ${((expiry-System.currentTimeMillis())/86400000L).toInt()+1} days left")
-                }
-            }catch(e:Exception){
-                Log.e(TAG,"HTTP fail",e)
-                android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"Network error: ${e.message} Contact $CONTACT") }
+            } catch (e: Exception) {
+                cb(false, "❌ Network error: ${e.message}\nTurn OFF WARP & try again")
             }
-        }.start()
+        }
     }
-
-    fun activateLicense(c: Context, code: String, cb: (Boolean, String) -> Unit) = verifyLicense(c, code, cb)
-    fun canUseApp(c: Context) = isActivated(c)
-    fun isValid(c: Context) = isActivated(c)
-    fun getRemainingDays(c: Context) = getDaysLeft(c)
-    fun getMaxShops(c: Context) = getMaxBranches(c)
 }
