@@ -15,14 +15,22 @@ object LicenseManager {
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun isActivated(c: Context): Boolean {
-        val p=prefs(c);
-        return p.getBoolean("valid",false) && p.getLong("expiry",0L) > System.currentTimeMillis()
+        val p=prefs(c)
+        val expiry = p.getLong("expiry",0L)
+        if(expiry > 4100000000000L) return p.getBoolean("valid",false) // LIFETIME 2100
+        return p.getBoolean("valid",false) && expiry > System.currentTimeMillis()
     }
     fun getDaysLeft(c: Context): Int {
-        val d=prefs(c).getLong("expiry",0L)-System.currentTimeMillis();
+        val expiry = prefs(c).getLong("expiry",0L)
+        if(expiry > 4100000000000L) return 9999
+        val d=expiry-System.currentTimeMillis()
         return if(d<=0)0 else (d/86400000L).toInt()+1
     }
-    fun getStatusText(c: Context): String = if(!isActivated(c)) "EXPIRED! Contact: $CONTACT" else "Active - ${getDaysLeft(c)} days"
+    fun getStatusText(c: Context): String {
+        if(!isActivated(c)) return "EXPIRED! Contact: $CONTACT"
+        if(getDaysLeft(c) >= 9999) return "✅ LIFETIME LICENSE - PERMANENT"
+        return "Active - ${getDaysLeft(c)} days"
+    }
     fun getMaxBranches(c: Context): Int = prefs(c).getInt("branches", if(isActivated(c)) 100 else 0)
     fun getLicenseCode(c: Context): String = prefs(c).getString("code","")?:""
 
@@ -31,28 +39,10 @@ object LicenseManager {
         Log.i(TAG,"Saved $code $branches branches")
     }
 
+    // --- NO LOCAL CODES - ALWAYS SERVER ---
     fun verifyLicense(c: Context, code: String, cb: (Boolean, String) -> Unit) {
         val clean = code.trim().uppercase()
         if(clean.isBlank()){ cb(false,"Enter code!"); return }
-
-        // --- LOCAL 14 / 30 DAY TESTS - No internet needed, always works ---
-        val localLic = when(clean) {
-            "TEST-14" -> Pair(14L, 3)
-            "TEST-30" -> Pair(30L, 3)
-            "SMART-14" -> Pair(14L, 3)
-            "SMART-30" -> Pair(30L, 3)
-            "CHT-3-30-XXX" -> Pair(30L, 3)
-            "SMART-90" -> Pair(90L, 5)
-            "SMART-365" -> Pair(365L, 10)
-            else -> null
-        }
-        if(localLic!= null) {
-            val expiry = System.currentTimeMillis() + localLic.first * 86400000L
-            saveLicense(c, clean, expiry, localLic.second)
-            cb(true, "Welcome! ${localLic.first} days | ${localLic.second} branches")
-            return
-        }
-
         httpVerify(c, clean, getDeviceId(c), cb)
     }
 
@@ -74,9 +64,8 @@ object LicenseManager {
                 }
 
                 val json = JSONObject(txt)
-                // support both formats: {valid, days} and {days, expiry}
                 val valid = json.optBoolean("valid", true)
-                if(!valid &&!json.has("days")) {
+                if(!valid && !json.has("days") && !json.has("expiry")) {
                     android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false, json.optString("message","Invalid code")) }
                     return@Thread
                 }
@@ -87,26 +76,30 @@ object LicenseManager {
                 var expiry = json.optLong("expiry",0L)
                 val used = json.optBoolean("used",false)
                 val bound = json.optString("deviceId","")
+                val isLifetime = json.optBoolean("lifetime", false) || days >= 3650
 
-                if(expiry==0L && days>0){
+                if(isLifetime) {
+                    expiry = 4102444800000L // Jan 1, 2100 = LIFETIME
+                } else if(expiry==0L && days>0){
                     expiry = System.currentTimeMillis() + days*86400000L
                 }
                 if(expiry==0L){
                     android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"No expiry set") }
                     return@Thread
                 }
-                if(System.currentTimeMillis()>expiry){
+                if(!isLifetime && System.currentTimeMillis()>expiry){
                     android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"EXPIRED! Contact: $CONTACT") }
                     return@Thread
                 }
-                if(used && bound.isNotEmpty() && bound!=deviceId &&!code.startsWith("TEST-")){
+                if(used && bound.isNotEmpty() && bound!=deviceId){
                     android.os.Handler(android.os.Looper.getMainLooper()).post{ cb(false,"Used on another phone! $CONTACT") }
                     return@Thread
                 }
 
                 android.os.Handler(android.os.Looper.getMainLooper()).post{
                     saveLicense(c, code, expiry, branches)
-                    cb(true,"Welcome $name! ${((expiry-System.currentTimeMillis())/86400000L).toInt()+1} days left")
+                    val msg = if(isLifetime) "Welcome $name! LIFETIME LICENSE" else "Welcome $name! ${((expiry-System.currentTimeMillis())/86400000L).toInt()+1} days left"
+                    cb(true, msg)
                 }
             }catch(e:Exception){
                 Log.e(TAG,"HTTP fail",e)
@@ -120,4 +113,9 @@ object LicenseManager {
     fun isValid(c: Context) = isActivated(c)
     fun getRemainingDays(c: Context) = getDaysLeft(c)
     fun getMaxShops(c: Context) = getMaxBranches(c)
+    fun getExpiryDate(c: Context): String {
+        val expiry = prefs(c).getLong("expiry",0L)
+        if(expiry > 4100000000000L) return "2099-12-31 LIFETIME"
+        return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(expiry))
+    }
 }
