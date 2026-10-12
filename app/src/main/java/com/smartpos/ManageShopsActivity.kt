@@ -16,7 +16,7 @@ super.onCreate(b)
 val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.parseColor("#F1F5F9"))}
 
 val topBar=LinearLayout(this).apply{setBackgroundColor(Color.parseColor("#1E293B"));setPadding(30,50,30,20);orientation=LinearLayout.VERTICAL}
-topBar.addView(TextView(this).apply{text="🏪 Manage Shops - BUILD 365 UNBLOCKABLE";textSize=18f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE)})
+topBar.addView(TextView(this).apply{text="🏪 Manage Shops - BUILD 130";textSize=18f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE)})
 txtStatus=TextView(this).apply{text=LicenseManager.getStatusText(this@ManageShopsActivity);setTextColor(Color.parseColor("#38BDF8"));textSize=13f}
 topBar.addView(txtStatus)
 root.addView(topBar)
@@ -24,7 +24,7 @@ root.addView(topBar)
 val form=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(16,16,16,16);setBackgroundColor(Color.WHITE)}
 val edName=EditText(this).apply{hint="Shop Name e.g. Rumuko Karoi"}
 val edLoc=EditText(this).apply{hint="Location e.g. Karoi Town"}
-val edCode=EditText(this).apply{hint="Enter License Code e.g. TEST-365"; setBackgroundColor(Color.parseColor("#FEF3C7"))}
+val edCode=EditText(this).apply{hint="Enter License Code e.g. TEST-14 or SMART-90"; setBackgroundColor(Color.parseColor("#FEF3C7"))}
 val btnAdd=Button(this).apply{text="➕ ADD SHOP";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE)}
 val btnActivate=Button(this).apply{text="🔑 ACTIVATE WITH CODE";setBackgroundColor(Color.parseColor("#16A34A"));setTextColor(Color.WHITE)}
 
@@ -37,12 +37,17 @@ if(shops.all.size>=max){
 Toast.makeText(this,"❌ LIMIT REACHED! Max $max branches.\n${LicenseManager.getStatusText(this)}\nBuy code: 0773996805",Toast.LENGTH_LONG).show()
 return@setOnClickListener
 }
+val id = name.lowercase().replace(" ","_")
+if(shops.contains(id)){
+Toast.makeText(this,"❌ Shop ID '$id' already exists!",Toast.LENGTH_LONG).show()
+return@setOnClickListener
+}
 val json = org.json.JSONObject().apply{
-    put("id", name.lowercase().replace(" ","_"))
+    put("id", id)
     put("name", name)
     put("location", edLoc.text.toString())
 }.toString()
-shops.edit().putString(name.lowercase().replace(" ","_"), json).apply()
+shops.edit().putString(id, json).apply()
 Toast.makeText(this,"✅ Shop $name added ${shops.all.size}/$max",Toast.LENGTH_SHORT).show()
 edName.setText(""); edLoc.setText("")
 renderShops()
@@ -51,7 +56,7 @@ renderShops()
 btnActivate.setOnClickListener{
 val code=edCode.text.toString().trim().uppercase()
 if(code.isEmpty()){Toast.makeText(this,"Enter code",Toast.LENGTH_SHORT).show();return@setOnClickListener}
-Toast.makeText(this,"⏳ Checking $code via Cloudflare...",Toast.LENGTH_SHORT).show()
+Toast.makeText(this,"⏳ Checking $code...",Toast.LENGTH_SHORT).show()
 btnActivate.isEnabled = false
 btnActivate.text = "⏳ CHECKING..."
 
@@ -70,7 +75,8 @@ LicenseManager.verifyLicense(this, code) { success, msg ->
 }
 
 form.addView(edName);form.addView(edLoc);form.addView(btnAdd)
-form.addView(TextView(this).apply{text="--- LICENSE ACTIVATION (TelOne-Proof) ---";setTextColor(Color.GRAY);textSize=11f;setPadding(0,20,0,5);gravity=Gravity.CENTER})
+form.addView(TextView(this).apply{text="--- LICENSE ACTIVATION ---";setTextColor(Color.GRAY);textSize=11f;setPadding(0,20,0,5);gravity=Gravity.CENTER})
+form.addView(TextView(this).apply{text="Offline codes: TEST-14, TEST-30\nOnline codes: SMART-14, SMART-30, SMART-90, SMART-365";setTextColor(Color.GRAY);textSize=10f;gravity=Gravity.CENTER;setPadding(0,0,0,8)})
 form.addView(edCode);form.addView(btnActivate)
 root.addView(form)
 
@@ -87,10 +93,12 @@ renderShops()
 private fun renderShops(){
 shopContainer.removeAllViews()
 val prefs=getSharedPreferences("shops_db",Context.MODE_PRIVATE)
+val max = LicenseManager.getMaxBranches(this)
 if(prefs.all.isEmpty()){
-shopContainer.addView(TextView(this).apply{text="No shops yet";setPadding(20,20,20,20);gravity=Gravity.CENTER;setTextColor(Color.GRAY)})
+shopContainer.addView(TextView(this).apply{text="No shops yet\n${prefs.all.size}/$max used";setPadding(20,20,20,20);gravity=Gravity.CENTER;setTextColor(Color.GRAY)})
 return
 }
+shopContainer.addView(TextView(this).apply{text="${prefs.all.size}/$max branches used";setPadding(8,4,8,8);setTextColor(Color.parseColor("#2563EB"));setTypeface(null,Typeface.BOLD);textSize=12f})
 for((k,v) in prefs.all){
 try{
 val j = org.json.JSONObject(v.toString())
