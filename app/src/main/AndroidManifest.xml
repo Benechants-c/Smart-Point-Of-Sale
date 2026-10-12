@@ -29,6 +29,7 @@
         <activity android:name=".SalesActivity" android:exported="false" />
         <activity android:name=".StockPurchasingActivity" android:exported="false" />
         <activity android:name=".StockTransferActivity" android:exported="false" />
+        <activity android:name=".StockTakeActivity" android:exported="false" />
         <activity android:name=".UsersActivity" android:exported="false" />
 
     </application>
