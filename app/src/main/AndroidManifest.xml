@@ -1,60 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- INTERNET -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- BLUETOOTH - FOR PRINTER - REAL -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
-    <!-- STORAGE - FOR BACKUP -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
-        android:label="SMART POS"
-        android:requestLegacyExternalStorage="true">
+        android:label="SMART POS">
 
-        <activity
-            android:name=".LoginActivity"
-            android:exported="true">
+        <activity android:name=".LoginActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ADMIN -->
         <activity android:name=".AdminActivity" android:exported="false" />
         <activity android:name=".AdminDetailActivity" android:exported="false" />
         <activity android:name=".AuditLogActivity" android:exported="false" />
         <activity android:name=".BranchesActivity" android:exported="false" />
         <activity android:name=".ManageShopsActivity" android:exported="false" />
-        
-        <!-- POS -->
         <activity android:name=".PosLoginActivity" android:exported="false" />
         <activity android:name=".ReceiveStockActivity" android:exported="false" />
         <activity android:name=".ReportsActivity" android:exported="false" />
         <activity android:name=".SalesActivity" android:exported="false" />
-        
-        <!-- STOCK -->
         <activity android:name=".StockPurchasingActivity" android:exported="false" />
         <activity android:name=".StockTransferActivity" android:exported="false" />
         <activity android:name=".StockTakeActivity" android:exported="false" />
         <activity android:name=".StockListActivity" android:exported="false" />
-        
-        <!-- USERS -->
         <activity android:name=".UsersActivity" android:exported="false" />
-
-        <!-- ✅ NEW - SYSTEM SETTINGS - FULLY FUNCTIONAL - TAX INCLUSIVE - MISSING BEFORE! -->
         <activity android:name=".SystemSettingsActivity" android:exported="false" />
 
     </application>
