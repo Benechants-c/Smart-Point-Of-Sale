@@ -5,7 +5,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
         android:name=".MyApplication"
@@ -34,6 +37,11 @@
         <activity android:name=".StockListActivity" android:exported="false" />
         <activity android:name=".UsersActivity" android:exported="false" />
         <activity android:name=".SystemSettingsActivity" android:exported="false" />
+        
+        <!-- ADDED MISSING - NOW REAL -->
+        <activity android:name=".CashManagementActivity" android:exported="false" />
+        <activity android:name=".CustomersActivity" android:exported="false" />
+        <activity android:name=".PriceManagementActivity" android:exported="false" />
 
     </application>
 
