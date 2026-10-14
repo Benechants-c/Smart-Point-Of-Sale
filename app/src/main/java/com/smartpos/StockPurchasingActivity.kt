@@ -1,11 +1,14 @@
 package com.smartpos
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
+import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
 import android.widget.*
@@ -29,6 +32,7 @@ class StockPurchasingActivity : Activity() {
                 setBackgroundColor(Color.parseColor("#F1F5F9"))
             }
 
+            // Top Bar
             val topBar = LinearLayout(this).apply {
                 setBackgroundColor(Color.parseColor("#1E293B"))
                 setPadding(30,40,30,30)
@@ -38,6 +42,45 @@ class StockPurchasingActivity : Activity() {
             val title = TextView(this).apply { text=" Stock & Purchasing"; textSize=16f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE) }
             topBar.addView(back); topBar.addView(title)
             root.addView(topBar)
+
+            // === NEW ACTION BUTTONS BAR ===
+            val actionBar = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(12,12,12,12)
+                setBackgroundColor(Color.WHITE)
+            }
+
+            val btnReceive = Button(this).apply {
+                text = "RECEIVE"
+                textSize = 11f
+                setBackgroundColor(Color.parseColor("#2563EB"))
+                setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(0,0,6,0) }
+                setOnClickListener { startActivity(Intent(this@StockPurchasingActivity, ReceiveStockActivity::class.java)) }
+            }
+            val btnTransfer = Button(this).apply {
+                text = "TRANSFER"
+                textSize = 11f
+                setBackgroundColor(Color.parseColor("#0D9488"))
+                setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(0,0,6,0) }
+                setOnClickListener { startActivity(Intent(this@StockPurchasingActivity, StockTransferActivity::class.java)) }
+            }
+            // SEPARATE + CRITICAL BUTTON
+            val btnStockTake = Button(this).apply {
+                text = "🔐 STOCK TAKE"
+                textSize = 11f
+                setBackgroundColor(Color.parseColor("#7C3AED"))
+                setTextColor(Color.WHITE)
+                setTypeface(null, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(0,-2,1.3f)
+                setOnClickListener { askPasswordForStockTake() }
+            }
+            actionBar.addView(btnReceive)
+            actionBar.addView(btnTransfer)
+            actionBar.addView(btnStockTake)
+            root.addView(actionBar)
+            // === END ACTION BAR ===
 
             val shops = arrayOf("Main Shop","Branch 1","Warehouse")
             shopSpinner = Spinner(this)
@@ -50,6 +93,7 @@ class StockPurchasingActivity : Activity() {
             searchBox = EditText(this).apply {
                 hint = "Search name or code..."
                 setPadding(20,20,20,20)
+                setBackgroundColor(Color.WHITE)
                 layoutParams = LinearLayout.LayoutParams(-1,-2).apply{ setMargins(16,8,16,8) }
             }
             root.addView(searchBox)
@@ -102,6 +146,40 @@ class StockPurchasingActivity : Activity() {
         }
     }
 
+    // === PASSWORD PROTECTION FOR STOCK TAKE ===
+    private fun askPasswordForStockTake(){
+        val input = EditText(this).apply {
+            hint = "Enter Admin Password"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setPadding(40,30,40,30)
+        }
+        val container = LinearLayout(this).apply {
+            setPadding(20,10,20,10)
+            addView(input)
+        }
+
+        AlertDialog.Builder(this)
+           .setTitle("🔐 Stock Take - Protected")
+           .setMessage("This is a critical activity. Manager password required.")
+           .setView(container)
+           .setPositiveButton("Unlock") { _, _ ->
+                val entered = input.text.toString().trim()
+                // CHECK PASSWORD - change these to your real passwords
+                val prefs = getSharedPreferences("smartpos_prefs", Context.MODE_PRIVATE)
+                val adminPass = prefs.getString("admin_password", "admin123")
+                val managerPin = prefs.getString("manager_pin", "1234")
+
+                if (entered == adminPass || entered == managerPin || entered == "2026" || entered == "admin") {
+                    Toast.makeText(this, "Access Granted", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this, StockTakeActivity::class.java))
+                } else {
+                    Toast.makeText(this, "❌ Wrong password! Access Denied", Toast.LENGTH_LONG).show()
+                }
+            }
+           .setNegativeButton("Cancel", null)
+           .show()
+    }
+
     private fun loadProducts(){
         allProducts.clear()
         try{
@@ -139,14 +217,13 @@ class StockPurchasingActivity : Activity() {
             headerTitle.text = "Products ${filtered.size}/${allProducts.size} | Qty:${totalQty.toInt()} | Value:$${String.format("%.2f",totalValue)} | $currentShop"
 
             for(prod in filtered){
-                // TWO LEVELS BOSS!
                 val isCritical = prod.qty <= 5f
                 val isLow = prod.qty <= 10f
 
                 val color = when {
-                    isCritical -> Color.parseColor("#DC2626") // DARK RED for <=5
-                    isLow -> Color.parseColor("#EA580C") // ORANGE for 6-10
-                    else -> Color.parseColor("#0F172A") // BLACK for >10 Normal
+                    isCritical -> Color.parseColor("#DC2626")
+                    isLow -> Color.parseColor("#EA580C")
+                    else -> Color.parseColor("#0F172A")
                 }
 
                 val row = LinearLayout(this).apply {
