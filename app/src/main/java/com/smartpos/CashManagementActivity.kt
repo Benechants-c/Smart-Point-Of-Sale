@@ -10,7 +10,6 @@ class CashManagementActivity : Activity() {
         val back = Button(this).apply{ text="BACK" }
         back.setOnClickListener{ finish() }
         root.addView(back)
-        root.addView(TextView(this).apply{ text="Current Drawer: $5.00\nTotal Sales: Tax Inclusive"; setPadding(20,20,20,20) })
         setContentView(root)
     }
 }
