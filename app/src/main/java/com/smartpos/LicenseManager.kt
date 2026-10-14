@@ -23,7 +23,6 @@ object LicenseManager {
         return System.currentTimeMillis() <= exp
     }
 
-    // ✅ FIXES YOUR NEW ERROR #381
     fun getDaysLeft(c: Context): Int {
         val p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         if (!p.getBoolean("active", false)) return 0
