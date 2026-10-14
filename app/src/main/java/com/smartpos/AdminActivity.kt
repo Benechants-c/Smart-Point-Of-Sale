@@ -6,7 +6,11 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.widget.*
+import java.text.SimpleDateFormat
+import java.util.*
 
 class AdminActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,10 +81,52 @@ class AdminActivity : Activity() {
             val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
             val drawer = prefsCash.getFloat("drawer", 5.0f)
 
-            val dateRow = LinearLayout(this).apply { setPadding(24,16,24,8); orientation = LinearLayout.HORIZONTAL }
-            dateRow.addView(TextView(this).apply { text = "Overview"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")); layoutParams = LinearLayout.LayoutParams(0,-2,1f) })
-            dateRow.addView(TextView(this).apply { text = "📅 Today, 02/10/2026"; textSize = 12f; setTextColor(Color.parseColor("#64748B")) })
+            // ===== FIX 1 & 2: AUTO DATE + COLLAPSIBLE OVERVIEW =====
+            val autoDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+
+            val dateRow = LinearLayout(this).apply {
+                setPadding(24,16,24,16)
+                orientation = LinearLayout.HORIZONTAL
+                setBackgroundColor(Color.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                isClickable = true
+                isFocusable = true
+            }
+
+            val txtOverview = TextView(this).apply {
+                text = "Overview"; textSize = 20f; setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor("#0F172A"))
+                layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+            }
+            val txtDateAuto = TextView(this).apply {
+                text = "📅 Today, $autoDate"; textSize = 12f
+                setTextColor(Color.parseColor("#64748B"))
+                setTypeface(null, Typeface.BOLD)
+            }
+            val arrow = TextView(this).apply {
+                text = " ▼"
+                textSize = 14f
+                setTextColor(Color.parseColor("#0F172A"))
+            }
+            dateRow.addView(txtOverview)
+            dateRow.addView(txtDateAuto)
+            dateRow.addView(arrow)
             root.addView(dateRow)
+
+            // Container that hides on glance
+            val overviewContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE // HIDDEN ON GLANCE BOSS!
+            }
+
+            var isOverviewVisible = false
+            dateRow.setOnClickListener {
+                isOverviewVisible =!isOverviewVisible
+                overviewContainer.visibility = if(isOverviewVisible) View.VISIBLE else View.GONE
+                arrow.text = if(isOverviewVisible) " ▲" else " ▼"
+                txtOverview.text = if(isOverviewVisible) "Overview (tap to hide)" else "Overview"
+            }
+            // ===== END FIX =====
 
             fun kpiCard(bg:String, icon:String, title:String, value:String, sub:String, subColor:String): LinearLayout {
                 return LinearLayout(this).apply {
@@ -88,10 +134,10 @@ class AdminActivity : Activity() {
                     setBackgroundColor(Color.parseColor(bg))
                     setPadding(20,20,20,20)
                     layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(8,8,8,8) }
-                    addView(TextView(this@AdminActivity).apply { text = icon; textSize = 22f; gravity = android.view.Gravity.CENTER })
-                    addView(TextView(this@AdminActivity).apply { text = title; textSize = 11f; gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor("#334155")) })
-                    addView(TextView(this@AdminActivity).apply { text = value; textSize = 16f; setTypeface(null, Typeface.BOLD); gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor("#0F172A")) })
-                    addView(TextView(this@AdminActivity).apply { text = sub; textSize = 9f; gravity = android.view.Gravity.CENTER; setTextColor(Color.parseColor(subColor)) })
+                    addView(TextView(this@AdminActivity).apply { text = icon; textSize = 22f; gravity = Gravity.CENTER })
+                    addView(TextView(this@AdminActivity).apply { text = title; textSize = 11f; gravity = Gravity.CENTER; setTextColor(Color.parseColor("#334155")) })
+                    addView(TextView(this@AdminActivity).apply { text = value; textSize = 16f; setTypeface(null, Typeface.BOLD); gravity = Gravity.CENTER; setTextColor(Color.parseColor("#0F172A")) })
+                    addView(TextView(this@AdminActivity).apply { text = sub; textSize = 9f; gravity = Gravity.CENTER; setTextColor(Color.parseColor(subColor)) })
                 }
             }
             val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
@@ -102,9 +148,12 @@ class AdminActivity : Activity() {
             row2.addView(kpiCard(if(lowStock>0)"#FECACA" else "#BBF7D0", if(lowStock>0)"⚠️" else "✅","Low Stock",lowStock.toString()+" Items", if(lowStock>0)"Needs restock" else "All OK", if(lowStock>0)"#DC2626" else "#16A34A"))
             row2.addView(kpiCard("#A5F3FC","📦","Products",prodCount.toString(),"Active SKUs","#0F172A"))
             row2.addView(kpiCard("#FED7AA","👥","Customers",custCount.toString(),"REAL","#EA580C"))
-            root.addView(row1); root.addView(row2)
 
-            root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,8,24,8) })
+            overviewContainer.addView(row1)
+            overviewContainer.addView(row2)
+            root.addView(overviewContainer)
+
+            root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
             fun quickRow(b1:Button, b2:Button, b3:Button): LinearLayout {
                 val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
                 b1.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b2.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b3.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}
@@ -122,7 +171,6 @@ class AdminActivity : Activity() {
                 qBtn("🔄 STOCK TRANSFER","#0D9488"){ try{ startActivity(Intent(this, StockTransferActivity::class.java)) }catch(e:Exception){ Toast.makeText(this,""+e.message,1).show() } },
                 qBtn("🏢 ADD SUPPLIER","#FB923C"){ openSection("Purchasing") },
                 qBtn("👤 + ADD USER","#1E293B"){
-                    // FIXED - DIRECT TO USERS ACTIVITY
                     try{
                         startActivity(Intent(this, UsersActivity::class.java))
                     }catch(e:Exception){
@@ -158,12 +206,10 @@ class AdminActivity : Activity() {
 
     private fun openSection(title:String){
         try{
-            // FIX USERS - GO DIRECT TO USERS ACTIVITY
             if(title.contains("User")){
                 startActivity(Intent(this, UsersActivity::class.java))
                 return
             }
-            // >>> FIX: DIRECT OPEN REAL STOCK SCREEN <<<
             if(title.contains("Purchasing") || title.contains("Stock") || title.contains("Supplier")){
                 try {
                     startActivity(Intent(this, StockPurchasingActivity::class.java))
