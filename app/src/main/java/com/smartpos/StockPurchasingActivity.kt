@@ -24,6 +24,9 @@ class StockPurchasingActivity : Activity() {
     private lateinit var shopSpinner: Spinner
     private var currentShop = "Main Shop"
 
+    // === YOUR REAL ADMIN PASSWORDS ===
+    private val MASTER_PASSWORDS = listOf("admin123", "1234", "2026", "admin")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
@@ -35,23 +38,29 @@ class StockPurchasingActivity : Activity() {
             // Top Bar
             val topBar = LinearLayout(this).apply {
                 setBackgroundColor(Color.parseColor("#1E293B"))
-                setPadding(30,40,30,30)
+                setPadding(30,50,30,30)
                 orientation = LinearLayout.HORIZONTAL
             }
-            val back = TextView(this).apply { text=" <- Back"; textSize=14f; setTextColor(Color.WHITE); setOnClickListener{ finish() } }
-            val title = TextView(this).apply { text=" Stock & Purchasing"; textSize=16f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE) }
+            val back = TextView(this).apply {
+                text=" <- Back"; textSize=14f; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD)
+                setOnClickListener{ finish() }
+            }
+            val title = TextView(this).apply {
+                text=" Stock & Purchasing"; textSize=16f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE)
+            }
             topBar.addView(back); topBar.addView(title)
             root.addView(topBar)
 
-            // === NEW ACTION BUTTONS BAR ===
+            // === ACTION BUTTONS BAR - POLISHED ===
             val actionBar = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(12,12,12,12)
                 setBackgroundColor(Color.WHITE)
+                elevation = 4f
             }
 
             val btnReceive = Button(this).apply {
-                text = "RECEIVE"
+                text = "📥 RECEIVE"
                 textSize = 11f
                 setBackgroundColor(Color.parseColor("#2563EB"))
                 setTextColor(Color.WHITE)
@@ -59,41 +68,50 @@ class StockPurchasingActivity : Activity() {
                 setOnClickListener { startActivity(Intent(this@StockPurchasingActivity, ReceiveStockActivity::class.java)) }
             }
             val btnTransfer = Button(this).apply {
-                text = "TRANSFER"
+                text = "🔄 TRANSFER"
                 textSize = 11f
                 setBackgroundColor(Color.parseColor("#0D9488"))
                 setTextColor(Color.WHITE)
-                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(0,0,6,0) }
+                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(0,0,12,0) }
                 setOnClickListener { startActivity(Intent(this@StockPurchasingActivity, StockTransferActivity::class.java)) }
             }
-            // SEPARATE + CRITICAL BUTTON
+            // SEPARATE + CRITICAL BUTTON WITH DIVIDER
+            val divider = LinearLayout(this).apply {
+                setBackgroundColor(Color.parseColor("#E2E8F0"))
+                layoutParams = LinearLayout.LayoutParams(2, -1).apply{ setMargins(0,0,12,0) }
+            }
             val btnStockTake = Button(this).apply {
                 text = "🔐 STOCK TAKE"
                 textSize = 11f
                 setBackgroundColor(Color.parseColor("#7C3AED"))
                 setTextColor(Color.WHITE)
                 setTypeface(null, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(0,-2,1.3f)
+                layoutParams = LinearLayout.LayoutParams(0,-2,1.4f)
                 setOnClickListener { askPasswordForStockTake() }
             }
             actionBar.addView(btnReceive)
             actionBar.addView(btnTransfer)
+            actionBar.addView(divider)
             actionBar.addView(btnStockTake)
             root.addView(actionBar)
-            // === END ACTION BAR ===
 
             val shops = arrayOf("Main Shop","Branch 1","Warehouse")
             shopSpinner = Spinner(this)
             val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, shops)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             shopSpinner.adapter = adapter
-            val shopWrap = LinearLayout(this).apply { setPadding(16,8,16,8); setBackgroundColor(Color.WHITE); addView(shopSpinner) }
+            val shopWrap = LinearLayout(this).apply {
+                setPadding(16,10,16,10); setBackgroundColor(Color.WHITE)
+                addView(TextView(this@StockPurchasingActivity).apply{ text="Shop: "; textSize=12f; setTypeface(null,Typeface.BOLD) })
+                addView(shopSpinner)
+            }
             root.addView(shopWrap)
 
             searchBox = EditText(this).apply {
-                hint = "Search name or code..."
-                setPadding(20,20,20,20)
+                hint = "🔍 Search name or code..."
+                setPadding(24,20,24,20)
                 setBackgroundColor(Color.WHITE)
+                background = getDrawable(android.R.drawable.editbox_background)
                 layoutParams = LinearLayout.LayoutParams(-1,-2).apply{ setMargins(16,8,16,8) }
             }
             root.addView(searchBox)
@@ -111,16 +129,18 @@ class StockPurchasingActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundColor(Color.WHITE)
                 setPadding(16,12,16,12)
+                elevation = 2f
             }
-            headerRow.addView(TextView(this).apply { text="PRODUCT"; textSize=11f; setTypeface(null,Typeface.BOLD); layoutParams = LinearLayout.LayoutParams(0,-2,2.5f) })
-            headerRow.addView(TextView(this).apply { text="QTY"; textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(0,-2,0.7f) })
-            headerRow.addView(TextView(this).apply { text="PRICE"; textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(0,-2,0.9f) })
+            headerRow.addView(TextView(this).apply { text="PRODUCT"; textSize=11f; setTypeface(null,Typeface.BOLD); setTextColor(Color.parseColor("#64748B")); layoutParams = LinearLayout.LayoutParams(0,-2,2.5f) })
+            headerRow.addView(TextView(this).apply { text="QTY"; textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setTextColor(Color.parseColor("#64748B")); layoutParams = LinearLayout.LayoutParams(0,-2,0.7f) })
+            headerRow.addView(TextView(this).apply { text="PRICE"; textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setTextColor(Color.parseColor("#64748B")); layoutParams = LinearLayout.LayoutParams(0,-2,0.9f) })
             root.addView(headerRow)
 
             val scroll = ScrollView(this)
             listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
             scroll.addView(listContainer)
-            root.addView(scroll)
+            // Weight to fill remaining space
+            root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
 
             setContentView(root)
 
@@ -146,38 +166,51 @@ class StockPurchasingActivity : Activity() {
         }
     }
 
-    // === PASSWORD PROTECTION FOR STOCK TAKE ===
+    override fun onResume() {
+        super.onResume()
+        // Auto-refresh when coming back from Receive/Transfer
+        try { loadProducts(); render() } catch(_:Exception){}
+    }
+
+    // === PASSWORD PROTECTION - SEPARATE CRITICAL ACTIVITY ===
     private fun askPasswordForStockTake(){
         val input = EditText(this).apply {
-            hint = "Enter Admin Password"
+            hint = "Enter Manager / Admin Password"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setPadding(40,30,40,30)
+            setPadding(50,40,50,40)
+            textSize = 15f
         }
         val container = LinearLayout(this).apply {
-            setPadding(20,10,20,10)
+            orientation = LinearLayout.VERTICAL
+            setPadding(30,20,30,10)
             addView(input)
+            addView(TextView(this@StockPurchasingActivity).apply {
+                text = "Default: 1234 or admin123"
+                textSize = 11f
+                setTextColor(Color.GRAY)
+                setPadding(0,10,0,0)
+            })
         }
 
         AlertDialog.Builder(this)
-           .setTitle("🔐 Stock Take - Protected")
-           .setMessage("This is a critical activity. Manager password required.")
-           .setView(container)
-           .setPositiveButton("Unlock") { _, _ ->
+          .setTitle("🔐 Stock Take - Protected")
+          .setMessage("This is a critical activity that will adjust stock levels. Manager authorization required.")
+          .setView(container)
+          .setPositiveButton("Unlock") { _, _ ->
                 val entered = input.text.toString().trim()
-                // CHECK PASSWORD - change these to your real passwords
                 val prefs = getSharedPreferences("smartpos_prefs", Context.MODE_PRIVATE)
-                val adminPass = prefs.getString("admin_password", "admin123")
-                val managerPin = prefs.getString("manager_pin", "1234")
+                val adminPass = prefs.getString("admin_password", "admin123")?: "admin123"
+                val managerPin = prefs.getString("manager_pin", "1234")?: "1234"
 
-                if (entered == adminPass || entered == managerPin || entered == "2026" || entered == "admin") {
-                    Toast.makeText(this, "Access Granted", Toast.LENGTH_SHORT).show()
+                if (entered == adminPass || entered == managerPin || MASTER_PASSWORDS.contains(entered)) {
+                    Toast.makeText(this, "✅ Access Granted", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, StockTakeActivity::class.java))
                 } else {
                     Toast.makeText(this, "❌ Wrong password! Access Denied", Toast.LENGTH_LONG).show()
                 }
             }
-           .setNegativeButton("Cancel", null)
-           .show()
+          .setNegativeButton("Cancel", null)
+          .show()
     }
 
     private fun loadProducts(){
@@ -193,8 +226,7 @@ class StockPurchasingActivity : Activity() {
                     try{
                         val parts = v.toString().split("|")
                         val name = if(parts.isNotEmpty()) parts[0] else k
-                        val buy = if(parts.size>1) parts[1].toFloatOrNull()?:0f else 0f
-                        var sell = if(parts.size>2) parts[2].toFloatOrNull()?:0f else buy
+                        var sell = if(parts.size>2) parts[2].toFloatOrNull()?:0f else 0f
                         var qty = 1f
                         if(parts.size>3) qty = parts[3].toFloatOrNull()?:1f
                         if(name.isNotBlank()) allProducts.add(Prod(name,qty,sell))
@@ -221,15 +253,21 @@ class StockPurchasingActivity : Activity() {
                 val isLow = prod.qty <= 10f
 
                 val color = when {
-                    isCritical -> Color.parseColor("#DC2626")
-                    isLow -> Color.parseColor("#EA580C")
-                    else -> Color.parseColor("#0F172A")
+                    isCritical -> Color.parseColor("#DC2626") // Dark Red <=5
+                    isLow -> Color.parseColor("#EA580C") // Orange 6-10
+                    else -> Color.parseColor("#0F172A") // Black >10
                 }
 
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    setPadding(16,16,16,16)
+                    setPadding(16,18,16,18)
                 }
+                // Divider line
+                val dividerLine = View(this).apply {
+                    setBackgroundColor(Color.parseColor("#F1F5F9"))
+                    layoutParams = LinearLayout.LayoutParams(-1,2)
+                }
+
                 row.addView(TextView(this@StockPurchasingActivity).apply {
                     text = prod.name
                     textSize = 13f
@@ -253,6 +291,7 @@ class StockPurchasingActivity : Activity() {
                     layoutParams = LinearLayout.LayoutParams(0,-2,0.9f)
                 })
                 listContainer.addView(row)
+                listContainer.addView(dividerLine)
             }
         }catch(_:Exception){}
     }
