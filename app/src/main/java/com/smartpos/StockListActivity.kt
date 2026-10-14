@@ -30,6 +30,7 @@ class StockListActivity : Activity() {
                 setBackgroundColor(Color.parseColor("#F1F5F9"))
             }
 
+            // Top Bar
             val topBar = LinearLayout(this).apply {
                 setBackgroundColor(Color.parseColor("#1E293B"))
                 setPadding(30,50,30,30)
@@ -45,18 +46,20 @@ class StockListActivity : Activity() {
             topBar.addView(back); topBar.addView(title)
             root.addView(topBar)
 
+            // Shop Selector
             val shops = arrayOf("Main Shop","Branch 1","Warehouse")
             shopSpinner = Spinner(this)
             val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, shops)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             shopSpinner.adapter = adapter
             val shopWrap = LinearLayout(this).apply {
-                setPadding(16,10,16,10); setBackgroundColor(Color.WHITE)
+                setPadding(16,12,16,12); setBackgroundColor(Color.WHITE)
                 addView(TextView(this@StockListActivity).apply{ text="Shop: "; textSize=12f; setTypeface(null,Typeface.BOLD) })
                 addView(shopSpinner)
             }
             root.addView(shopWrap)
 
+            // Search
             searchBox = EditText(this).apply {
                 hint = "🔍 Search name or code..."
                 setPadding(24,20,24,20)
@@ -65,6 +68,7 @@ class StockListActivity : Activity() {
             }
             root.addView(searchBox)
 
+            // Summary Header
             headerTitle = TextView(this).apply {
                 text = "Products 0 | Value: 0 | Main Shop"
                 setPadding(16,12,16,12)
@@ -74,6 +78,7 @@ class StockListActivity : Activity() {
             }
             root.addView(headerTitle)
 
+            // Column Headers
             val headerRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundColor(Color.WHITE)
@@ -84,6 +89,7 @@ class StockListActivity : Activity() {
             headerRow.addView(TextView(this).apply { text="PRICE"; textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setTextColor(Color.parseColor("#64748B")); layoutParams = LinearLayout.LayoutParams(0,-2,0.9f) })
             root.addView(headerRow)
 
+            // List
             val scroll = ScrollView(this)
             listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
             scroll.addView(listContainer)
@@ -138,13 +144,15 @@ class StockListActivity : Activity() {
                     }catch(_:Exception){}
                 }
             }
+            // Sort by critical first
+            allProducts.sortBy { it.qty }
         }catch(_:Exception){}
     }
 
     private fun render(){
         try{
             listContainer.removeAllViews()
-            val filter = searchBox.text.toString().lowercase()
+            val filter = searchBox.text.toString().lowercase().trim()
             val filtered = if(filter.isBlank()) allProducts else allProducts.filter{ it.name.lowercase().contains(filter) }
 
             var totalQty = 0f
@@ -157,9 +165,9 @@ class StockListActivity : Activity() {
                 val isCritical = prod.qty <= 5f
                 val isLow = prod.qty <= 10f
                 val color = when {
-                    isCritical -> Color.parseColor("#DC2626")
-                    isLow -> Color.parseColor("#EA580C")
-                    else -> Color.parseColor("#0F172A")
+                    isCritical -> Color.parseColor("#DC2626") // RED <=5
+                    isLow -> Color.parseColor("#EA580C") // ORANGE 6-10
+                    else -> Color.parseColor("#0F172A") // BLACK >10
                 }
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -179,8 +187,22 @@ class StockListActivity : Activity() {
                     layoutParams = LinearLayout.LayoutParams(0,-2,0.9f)
                 })
                 listContainer.addView(row)
-                listContainer.addView(View(this).apply { setBackgroundColor(Color.parseColor("#F1F5F9")); layoutParams = LinearLayout.LayoutParams(-1,2) })
+                // Divider
+                listContainer.addView(View(this).apply {
+                    setBackgroundColor(Color.parseColor("#F1F5F9"))
+                    layoutParams = LinearLayout.LayoutParams(-1,2)
+                })
             }
-        }catch(_:Exception){}
+
+            if(filtered.isEmpty()){
+                listContainer.addView(TextView(this).apply {
+                    text = "\nNo products found"; gravity=Gravity.CENTER; setPadding(0,40,0,40)
+                    setTextColor(Color.GRAY)
+                })
+            }
+
+        }catch(e:Exception){
+            Toast.makeText(this, "Render error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 }
