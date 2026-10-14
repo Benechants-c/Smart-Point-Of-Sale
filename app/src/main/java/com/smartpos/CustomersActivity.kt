@@ -2,7 +2,6 @@ package com.smartpos
 import android.app.Activity
 import android.os.Bundle
 import android.widget.*
-import android.graphics.Color
 class CustomersActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -11,7 +10,6 @@ class CustomersActivity : Activity() {
         val back = Button(this).apply{ text="BACK" }
         back.setOnClickListener{ finish() }
         root.addView(back)
-        root.addView(TextView(this).apply{ text="Customers list will show here\nTax Inclusive Mode\nCurrency from Settings"; setPadding(20,20,20,20) })
         setContentView(root)
     }
 }
