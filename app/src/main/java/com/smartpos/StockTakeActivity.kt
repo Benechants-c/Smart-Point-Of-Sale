@@ -37,7 +37,7 @@ class StockTakeActivity : Activity() {
             setPadding(20,16,20,16); gravity=Gravity.CENTER_VERTICAL
         }
         head.addView(TextView(this).apply{
-            text="📦 STOCK TAKE - BUILD 131.5 BIG FONT"; setTextColor(Color.WHITE); textSize=16f
+            text="📦 STOCK TAKE - BUILD 132 REAL FIX"; setTextColor(Color.WHITE); textSize=16f
             setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
         head.addView(Button(this).apply{
@@ -63,12 +63,11 @@ class StockTakeActivity : Activity() {
             setText("${sdf.format(Date())} stock take"); setTextColor(Color.BLACK); textSize=16f
         }
         txtSummary = TextView(this).apply{ text="Loading..."; setTextColor(Color.GRAY); textSize=14f; setTypeface(null,Typeface.BOLD) }
-        val btnSave = Button(this).apply{ text="💾 SAVE ANYTIME (even if not finished)"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
+        val btnSave = Button(this).apply{ text="💾 SAVE ANYTIME"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
         val btnHistory = Button(this).apply{ text="📜 VIEW SAVED TAKES"; textSize=14f; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE) }
         topForm.addView(edFileName); topForm.addView(txtSummary); topForm.addView(btnSave); topForm.addView(btnHistory)
         root.addView(topForm)
 
-        // BIGGER HEADER 13f -> 14f BOLD
         val headerRow = LinearLayout(this).apply{
             orientation=LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#E2E8F0")); setPadding(10,14,10,14)
         }
@@ -94,15 +93,13 @@ class StockTakeActivity : Activity() {
         container.removeAllViews(); countedMap.clear()
         productsCache = getAllProducts()
         if(productsCache.isEmpty()){
-            container.addView(TextView(this).apply{ text="No products found - check StockListActivity works"; textSize=16f; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
+            container.addView(TextView(this).apply{ text="No products found - Add product first in ADD PRODUCT (Main or Rukudzo)"; textSize=16f; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
         }
         for(prod in productsCache){
             val id = prod.optString("id"); val name = prod.optString("name","Unknown"); val code = prod.optString("code",id)
             val stockHand = prod.optInt("quantity",0)
             countedMap[id]=stockHand
-            // BIGGER ROW PADDING
             val row = LinearLayout(this).apply{ orientation=LinearLayout.HORIZONTAL; setPadding(10,16,10,16); setBackgroundColor(Color.WHITE) }
-            // BIGGER FONTS 11f -> 15f / 10f -> 13f
             val tvName = TextView(this).apply{ text=name; textSize=15f; setTextColor(Color.BLACK); setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,2f) }
             val tvCode = TextView(this).apply{ text=code; textSize=13f; setTextColor(Color.GRAY); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,1f) }
             val tvHand = TextView(this).apply{ text=stockHand.toString(); textSize=15f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,0.8f) }
@@ -138,14 +135,14 @@ class StockTakeActivity : Activity() {
         }
         txtValueCost.text="Cost: Hand $${"%.2f".format(costH)} → Counted $${"%.2f".format(costC)}"
         txtValueSell.text="Sell: Hand $${"%.2f".format(sellH)} → Counted $${"%.2f".format(sellC)} | Profit $${"%.2f".format(sellC-costC)}"
-        txtSummary.text="${productsCache.size} items | 🔴$neg missing 🟢$zero ok 🔵$pos extra | CAN SAVE ANYTIME"
+        txtSummary.text="${productsCache.size} items | 🔴$neg missing 🟢$zero ok 🔵$pos extra"
     }
 
     private fun getAllProducts(): List<JSONObject>{
         val list=mutableListOf<JSONObject>()
         val seen = HashSet<String>()
-        val prefNames=listOf("stock_main","products_db","products","stock_db","inventory")
-        for(prefName in prefNames){
+        val prefNames=listOf("products_main","products_rukudzo","stock_main","products_db","products","stock_db","inventory","stock_rukudzo")
+        for(prefName in prefNames.distinct()){
             try{
                 val pref=getSharedPreferences(prefName, Context.MODE_PRIVATE)
                 for((k,v) in pref.all){
