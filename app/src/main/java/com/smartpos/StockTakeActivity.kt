@@ -34,44 +34,45 @@ class StockTakeActivity : Activity() {
         val head = LinearLayout(this).apply{
             orientation=LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(16,12,16,12); gravity=Gravity.CENTER_VERTICAL
+            setPadding(20,16,20,16); gravity=Gravity.CENTER_VERTICAL
         }
         head.addView(TextView(this).apply{
-            text="📦 STOCK TAKE - BUILD 131.3"; setTextColor(Color.WHITE); textSize=14f
+            text="📦 STOCK TAKE - BUILD 131.5 BIG FONT"; setTextColor(Color.WHITE); textSize=16f
             setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
         head.addView(Button(this).apply{
-            text="BACK"; setBackgroundColor(Color.parseColor("#475569")); setTextColor(Color.WHITE)
+            text="BACK"; textSize=13f; setBackgroundColor(Color.parseColor("#475569")); setTextColor(Color.WHITE)
             setOnClickListener{ finish() }
         })
         root.addView(head)
 
         val valuesBar = LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
-            setPadding(12,12,12,12); setBackgroundColor(Color.WHITE)
+            setPadding(16,14,16,14); setBackgroundColor(Color.WHITE)
         }
-        txtValueCost = TextView(this).apply{ text="Cost Value: $0.00"; setTypeface(null,Typeface.BOLD); textSize=13f; setTextColor(Color.BLACK) }
-        txtValueSell = TextView(this).apply{ text="Sell Value: $0.00"; setTypeface(null,Typeface.BOLD); textSize=13f; setTextColor(Color.parseColor("#2563EB")) }
+        txtValueCost = TextView(this).apply{ text="Cost Value: $0.00"; setTypeface(null,Typeface.BOLD); textSize=15f; setTextColor(Color.BLACK) }
+        txtValueSell = TextView(this).apply{ text="Sell Value: $0.00"; setTypeface(null,Typeface.BOLD); textSize=15f; setTextColor(Color.parseColor("#2563EB")) }
         valuesBar.addView(txtValueCost); valuesBar.addView(txtValueSell)
         root.addView(valuesBar)
 
         val topForm = LinearLayout(this).apply{
-            orientation=LinearLayout.VERTICAL; setPadding(12,12,12,12); setBackgroundColor(Color.WHITE)
+            orientation=LinearLayout.VERTICAL; setPadding(16,12,16,12); setBackgroundColor(Color.WHITE)
         }
         val edFileName = EditText(this).apply{
             val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-            setText("${sdf.format(Date())} stock take"); setTextColor(Color.BLACK)
+            setText("${sdf.format(Date())} stock take"); setTextColor(Color.BLACK); textSize=16f
         }
-        txtSummary = TextView(this).apply{ text="Loading..."; setTextColor(Color.GRAY); textSize=12f }
-        val btnSave = Button(this).apply{ text="💾 SAVE ANYTIME (even if not finished)"; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
-        val btnHistory = Button(this).apply{ text="📜 VIEW SAVED TAKES"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE) }
+        txtSummary = TextView(this).apply{ text="Loading..."; setTextColor(Color.GRAY); textSize=14f; setTypeface(null,Typeface.BOLD) }
+        val btnSave = Button(this).apply{ text="💾 SAVE ANYTIME (even if not finished)"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
+        val btnHistory = Button(this).apply{ text="📜 VIEW SAVED TAKES"; textSize=14f; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE) }
         topForm.addView(edFileName); topForm.addView(txtSummary); topForm.addView(btnSave); topForm.addView(btnHistory)
         root.addView(topForm)
 
+        // BIGGER HEADER 13f -> 14f BOLD
         val headerRow = LinearLayout(this).apply{
-            orientation=LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#E2E8F0")); setPadding(8,8,8,8)
+            orientation=LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#E2E8F0")); setPadding(10,14,10,14)
         }
-        fun h(t:String,w:Float)=TextView(this).apply{ text=t; setTypeface(null,Typeface.BOLD); textSize=10f; setTextColor(Color.BLACK); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,w) }
+        fun h(t:String,w:Float)=TextView(this).apply{ text=t; setTypeface(null,Typeface.BOLD); textSize=14f; setTextColor(Color.BLACK); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,w) }
         headerRow.addView(h("Product",2f)); headerRow.addView(h("Code",1f)); headerRow.addView(h("In Hand",0.8f)); headerRow.addView(h("Counted",1f)); headerRow.addView(h("Var",0.8f))
         root.addView(headerRow)
 
@@ -93,18 +94,20 @@ class StockTakeActivity : Activity() {
         container.removeAllViews(); countedMap.clear()
         productsCache = getAllProducts()
         if(productsCache.isEmpty()){
-            container.addView(TextView(this).apply{ text="No products found"; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
+            container.addView(TextView(this).apply{ text="No products found - check StockListActivity works"; textSize=16f; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
         }
         for(prod in productsCache){
             val id = prod.optString("id"); val name = prod.optString("name","Unknown"); val code = prod.optString("code",id)
             val stockHand = prod.optInt("quantity",0)
             countedMap[id]=stockHand
-            val row = LinearLayout(this).apply{ orientation=LinearLayout.HORIZONTAL; setPadding(6,6,6,6); setBackgroundColor(Color.WHITE) }
-            val tvName = TextView(this).apply{ text=name; textSize=11f; setTextColor(Color.BLACK); layoutParams=LinearLayout.LayoutParams(0,-2,2f) }
-            val tvCode = TextView(this).apply{ text=code; textSize=10f; setTextColor(Color.GRAY); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,1f) }
-            val tvHand = TextView(this).apply{ text=stockHand.toString(); textSize=11f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,0.8f) }
-            val edCounted = EditText(this).apply{ setText(stockHand.toString()); textSize=11f; gravity=Gravity.CENTER; setBackgroundColor(Color.parseColor("#FEF3C7")); layoutParams=LinearLayout.LayoutParams(0,-2,1f) }
-            val tvVar = TextView(this).apply{ text="0"; textSize=12f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setTextColor(Color.parseColor("#16A34A")); layoutParams=LinearLayout.LayoutParams(0,-2,0.8f) }
+            // BIGGER ROW PADDING
+            val row = LinearLayout(this).apply{ orientation=LinearLayout.HORIZONTAL; setPadding(10,16,10,16); setBackgroundColor(Color.WHITE) }
+            // BIGGER FONTS 11f -> 15f / 10f -> 13f
+            val tvName = TextView(this).apply{ text=name; textSize=15f; setTextColor(Color.BLACK); setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,2f) }
+            val tvCode = TextView(this).apply{ text=code; textSize=13f; setTextColor(Color.GRAY); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,1f) }
+            val tvHand = TextView(this).apply{ text=stockHand.toString(); textSize=15f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; layoutParams=LinearLayout.LayoutParams(0,-2,0.8f) }
+            val edCounted = EditText(this).apply{ setText(stockHand.toString()); textSize=15f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setBackgroundColor(Color.parseColor("#FEF3C7")); layoutParams=LinearLayout.LayoutParams(0,-2,1f) }
+            val tvVar = TextView(this).apply{ text="0"; textSize=15f; setTypeface(null,Typeface.BOLD); gravity=Gravity.CENTER; setTextColor(Color.parseColor("#16A34A")); layoutParams=LinearLayout.LayoutParams(0,-2,0.8f) }
             edCounted.addTextChangedListener(object:TextWatcher{
                 override fun beforeTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){}
                 override fun onTextChanged(s:CharSequence?,a:Int,b:Int,c:Int){}
@@ -118,7 +121,7 @@ class StockTakeActivity : Activity() {
             row.addView(tvName); row.addView(tvCode); row.addView(tvHand); row.addView(edCounted); row.addView(tvVar)
             container.addView(row)
             val sep = View(this)
-            sep.layoutParams = LinearLayout.LayoutParams(-1,1)
+            sep.layoutParams = LinearLayout.LayoutParams(-1,2)
             sep.setBackgroundColor(Color.parseColor("#E2E8F0"))
             container.addView(sep)
         }
@@ -140,26 +143,43 @@ class StockTakeActivity : Activity() {
 
     private fun getAllProducts(): List<JSONObject>{
         val list=mutableListOf<JSONObject>()
-        val prefNames=listOf("products_db","products","stock_db","inventory","products_list")
+        val seen = HashSet<String>()
+        val prefNames=listOf("stock_main","products_db","products","stock_db","inventory")
         for(prefName in prefNames){
             try{
                 val pref=getSharedPreferences(prefName, Context.MODE_PRIVATE)
-                for((_,v) in pref.all){
+                for((k,v) in pref.all){
+                    if(seen.contains(k)) continue
                     try{
-                        val j=JSONObject(v.toString())
-                        if(j.has("name")||j.has("product_name")){
-                            val norm=JSONObject()
-                            norm.put("id",j.optString("id",j.optString("code",j.optString("barcode",""))))
-                            norm.put("name",j.optString("name",j.optString("product_name","")))
+                        val raw = v.toString()
+                        val norm = JSONObject()
+                        if(raw.trim().startsWith("{")){
+                            val j=JSONObject(raw)
+                            norm.put("id",j.optString("id",j.optString("code",k)))
+                            norm.put("name",j.optString("name",j.optString("product_name",k)))
                             norm.put("code",j.optString("code",j.optString("barcode",norm.optString("id"))))
                             norm.put("quantity",j.optInt("quantity",j.optInt("stock",j.optInt("qty",j.optInt("stock_in_hand",0)))))
                             norm.put("cost",j.optDouble("cost",j.optDouble("cost_price",j.optDouble("buy_price",0.0))))
                             norm.put("sell",j.optDouble("price",j.optDouble("selling_price",j.optDouble("sell_price",0.0))))
+                        } else {
+                            val parts = raw.split("|")
+                            val name = if(parts.isNotEmpty()) parts[0] else k
+                            val price = if(parts.size>2) parts[2].toFloatOrNull()?:0f else if(parts.size>1) parts[1].toFloatOrNull()?:0f else 0f
+                            var qty = 1f
+                            if(parts.size>3) qty = parts[3].toFloatOrNull()?:1f
+                            norm.put("id",k)
+                            norm.put("name",name)
+                            norm.put("code",k)
+                            norm.put("quantity",qty.toInt())
+                            norm.put("cost",price.toDouble()*0.7)
+                            norm.put("sell",price.toDouble())
+                        }
+                        if(norm.optString("name").isNotBlank()){
+                            seen.add(k)
                             list.add(norm)
                         }
                     }catch(_:Exception){}
                 }
-                if(list.isNotEmpty()) break
             }catch(_:Exception){}
         }
         return list.distinctBy{it.optString("id")}
@@ -191,7 +211,7 @@ class StockTakeActivity : Activity() {
         val pref=getSharedPreferences("stock_takes_db", Context.MODE_PRIVATE)
         if(pref.all.isEmpty()){ Toast.makeText(this,"No stock takes yet",Toast.LENGTH_SHORT).show(); return }
         val layout=LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setPadding(20,20,20,20) }
-        val txt=TextView(this).apply{ textSize=11f; setTextColor(Color.BLACK) }
+        val txt=TextView(this).apply{ textSize=14f; setTextColor(Color.BLACK) }
         val sb=StringBuilder()
         for((_,v) in pref.all){
             try{
