@@ -10,6 +10,8 @@ import android.widget.*
 
 class LoginActivity : Activity() {
     private val CONTACT_NUMBER = "+263773996805"
+    private lateinit var txtLicense: TextView
+    private lateinit var btnLogin: Button
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -17,27 +19,10 @@ class LoginActivity : Activity() {
         val title=TextView(this).apply{text="SmartPOS Login";textSize=20f;setTypeface(null,Typeface.BOLD)}
         val inputEmail=EditText(this).apply{hint="Email/Phone OR Name"}
         val inputPass=EditText(this).apply{hint="PIN";inputType=129}
-        val btnLogin=Button(this).apply{text="Login";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE)}
-        val txtLicense=TextView(this).apply{setPadding(0,20,0,0);textSize=15f;setTypeface(null,Typeface.BOLD)}
+        btnLogin=Button(this).apply{text="Login";setBackgroundColor(Color.parseColor("#1E293B"));setTextColor(Color.WHITE)}
+        txtLicense=TextView(this).apply{setPadding(0,20,0,0);textSize=15f;setTypeface(null,Typeface.BOLD)}
 
-        val daysLeft=LicenseManager.getDaysLeft(this)
-        val canUse=LicenseManager.canUseApp(this)
-        val statusText=LicenseManager.getStatusText(this)
-
-        if(!canUse){
-            txtLicense.text="❌ EXPIRED!\nContact: $CONTACT_NUMBER\nCall/Whatsapp/Text - TAP TO CONTACT"
-            txtLicense.setTextColor(Color.parseColor("#DC2626"))
-            txtLicense.setOnClickListener { openContactOptions() }
-            btnLogin.isEnabled=false
-            btnLogin.text="EXPIRED - TAP LICENSE TEXT TO CONTACT"
-            btnLogin.setBackgroundColor(Color.parseColor("#DC2626"))
-        }else if(daysLeft in 1..3){
-            txtLicense.text="⚠️ $statusText\n$daysLeft days left! Contact: $CONTACT_NUMBER"
-            txtLicense.setTextColor(Color.parseColor("#EA580C"))
-        }else{
-            txtLicense.text="✅ $statusText"
-            txtLicense.setTextColor(Color.parseColor("#16A34A"))
-        }
+        refreshLicenseStatus()
 
         btnLogin.setOnClickListener{
             if(!LicenseManager.canUseApp(this)){
@@ -78,7 +63,6 @@ class LoginActivity : Activity() {
             setOnClickListener{startActivity(Intent(this@LoginActivity,ManageShopsActivity::class.java))}
         }
 
-        // WhatsApp quick button
         val btnWhatsApp=Button(this).apply{
             text="💬 WhatsApp: $CONTACT_NUMBER";setBackgroundColor(Color.parseColor("#25D366"));setTextColor(Color.WHITE)
             setOnClickListener{ openWhatsApp() }
@@ -88,8 +72,44 @@ class LoginActivity : Activity() {
         setContentView(root)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // FIX: Refresh license when coming back from Activate screen
+        if(::txtLicense.isInitialized && ::btnLogin.isInitialized){
+            refreshLicenseStatus()
+        }
+    }
+
+    private fun refreshLicenseStatus(){
+        val daysLeft=LicenseManager.getDaysLeft(this)
+        val canUse=LicenseManager.canUseApp(this)
+        val statusText=LicenseManager.getStatusText(this)
+
+        if(!canUse){
+            txtLicense.text="❌ EXPIRED!\nContact: $CONTACT_NUMBER\nCall/Whatsapp/Text - TAP TO CONTACT"
+            txtLicense.setTextColor(Color.parseColor("#DC2626"))
+            txtLicense.setOnClickListener { openContactOptions() }
+            btnLogin.isEnabled=false
+            btnLogin.text="EXPIRED - TAP LICENSE TEXT TO CONTACT"
+            btnLogin.setBackgroundColor(Color.parseColor("#DC2626"))
+        }else if(daysLeft in 1..3){
+            txtLicense.text="⚠️ $statusText\n$daysLeft days left! Contact: $CONTACT_NUMBER"
+            txtLicense.setTextColor(Color.parseColor("#EA580C"))
+            txtLicense.setOnClickListener(null)
+            btnLogin.isEnabled=true
+            btnLogin.text="Login"
+            btnLogin.setBackgroundColor(Color.parseColor("#1E293B"))
+        }else{
+            txtLicense.text="✅ $statusText"
+            txtLicense.setTextColor(Color.parseColor("#16A34A"))
+            txtLicense.setOnClickListener(null)
+            btnLogin.isEnabled=true
+            btnLogin.text="Login"
+            btnLogin.setBackgroundColor(Color.parseColor("#1E293B"))
+        }
+    }
+
     private fun openContactOptions() {
-        // Show chooser: Call or WhatsApp
         val options = arrayOf("📞 Call $CONTACT_NUMBER", "💬 WhatsApp", "📱 Text/SMS")
         android.app.AlertDialog.Builder(this)
            .setTitle("Contact Chatewa")
