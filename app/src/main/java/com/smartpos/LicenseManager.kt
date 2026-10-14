@@ -13,17 +13,24 @@ object LicenseManager {
     fun getDeviceId(c: Context): String {
         return try {
             Settings.Secure.getString(c.contentResolver, Settings.Secure.ANDROID_ID)
-        } catch (e: Exception) {
-            "unknown_device"
-        } ?: "unknown_device"
+        } catch (e: Exception) { "unknown_device" } ?: "unknown_device"
     }
 
-    // ✅ THIS FIXES YOUR RED ERROR IN LoginActivity.kt:43
     fun canUseApp(c: Context): Boolean {
         val p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         if (!p.getBoolean("active", false)) return false
         val exp = p.getLong("expiry", 0L)
         return System.currentTimeMillis() <= exp
+    }
+
+    // ✅ FIXES YOUR NEW ERROR #381
+    fun getDaysLeft(c: Context): Int {
+        val p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        if (!p.getBoolean("active", false)) return 0
+        val exp = p.getLong("expiry", 0L)
+        val diff = exp - System.currentTimeMillis()
+        if (diff <= 0) return 0
+        return (diff / 86400000L).toInt()
     }
 
     fun verifyLicense(context: Context, code: String, cb: (Boolean, String)->Unit) {
@@ -37,27 +44,21 @@ object LicenseManager {
                 conn.requestMethod = "GET"
                 conn.connectTimeout = 15000
                 conn.readTimeout = 15000
-                
                 val responseCode = conn.responseCode
                 val input = if (responseCode == 200) conn.inputStream else conn.errorStream
                 val reader = input.bufferedReader()
                 val sb = StringBuilder()
                 var line: String? = reader.readLine()
-                while (line != null) {
-                    sb.append(line)
-                    line = reader.readLine()
-                }
+                while (line != null) { sb.append(line); line = reader.readLine() }
                 reader.close()
                 val text = sb.toString()
-                
                 val obj = JSONObject(text)
                 val valid = obj.optBoolean("valid", false)
                 if (valid) {
                     val days = obj.optInt("days", 30)
                     val branches = obj.optInt("branches", 3)
                     val expiry = obj.optLong("expiry", 0L)
-                    val pref = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-                    pref.edit()
+                    context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
                         .putString("code", cleanCode)
                         .putInt("days", days)
                         .putInt("branches", branches)
@@ -79,8 +80,7 @@ object LicenseManager {
     fun getMaxBranches(c: Context): Int {
         val p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         if (!p.getBoolean("active", false)) return 1
-        val exp = p.getLong("expiry", 0L)
-        if (System.currentTimeMillis() > exp) return 1
+        if (System.currentTimeMillis() > p.getLong("expiry", 0L)) return 1
         return p.getInt("branches", 1)
     }
 
@@ -89,7 +89,7 @@ object LicenseManager {
         if (!p.getBoolean("active", false)) return "No license - 1 branch demo - Buy: 0773996805"
         val exp = p.getLong("expiry", 0L)
         if (System.currentTimeMillis() > exp) return "EXPIRED - Buy new code: 0773996805"
-        val daysLeft = ((exp - System.currentTimeMillis()) / 86400000L).toInt()
+        val daysLeft = getDaysLeft(c)
         val code = p.getString("code","")
         return "✅ Active: " + code + " - " + p.getInt("days",0) + " days - " + p.getInt("branches",0) + " shops - " + daysLeft + " days left"
     }
