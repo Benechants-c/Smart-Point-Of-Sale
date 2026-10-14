@@ -1,12 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
- android:orientation="vertical"
- android:padding="16dp"
- android:layout_width="match_parent"
- android:layout_height="wrap_content">
- <TextView android:text="Stock Tools" android:textStyle="bold" android:textSize="18sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
- <Button android:id="@+id/btnAdjustments" android:text="Stock and Price Adjustments" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"/>
- <Button android:id="@+id/btnHistory" android:text="Stock History Audit Log" android:layout_width="match_parent" android:layout_height="wrap_content"/>
- <Button android:id="@+id/btnPrint" android:text="Print Stock Sheet" android:layout_width="match_parent" android:layout_height="wrap_content"/>
- <Button android:id="@+id/btnHelp" android:text="Help" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:text="Stock Tools"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnReceiveStock"
+        android:text="📥 Receive Stock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"/>
+
+    <Button android:id="@+id/btnTransferStock"
+        android:text="🔄 Stock Transfer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnAdjustments"
+        android:text="Stock and Price Adjustments"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <View android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E2E8F0"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- CRITICAL SEPARATE BUTTON -->
+    <TextView
+        android:text="Critical - Requires Password"
+        android:textSize="12sp"
+        android:textColor="#DC2626"
+        android:textStyle="bold"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnStockTake"
+        android:text="🔐 STOCK TAKE - Physical Count"
+        android:textStyle="bold"
+        android:backgroundTint="#7C3AED"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="6dp"/>
+
+    <View android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E2E8F0"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <Button android:id="@+id/btnHistory"
+        android:text="Stock History Audit Log"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnPrint"
+        android:text="Print Stock Sheet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnHelp"
+        android:text="Help"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
 </LinearLayout>
