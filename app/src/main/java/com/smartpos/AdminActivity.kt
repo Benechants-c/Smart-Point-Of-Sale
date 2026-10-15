@@ -10,19 +10,13 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import org.json.JSONObject
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
 class AdminActivity : Activity() {
-    data class StockItem(val sku:String, val name:String, val qty:Int, val sell:Float, val prefFile:String)
+    data class StockItem(val sku:String, val name:String, val qty:Int, val sell:Float)
 
     private val allStockItems = mutableListOf<StockItem>()
-    private lateinit var txtStockValue: TextView
-    private lateinit var txtProducts: TextView
-    private lateinit var txtCustomers: TextView
-    private lateinit var txtLowStock: TextView
-    private lateinit var txtLowSub: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +40,6 @@ class AdminActivity : Activity() {
             var todaySales = 0f; var profit = 0f; var stockValue = 0f; var lowStock = 0; var prodCount = 0; var custCount = 0
             var debugInfo = ""
 
-            // SALES - This already works for you
             try{
                 val salesPrefs = listOf("sales_main","sales_rukudzo","sales","sales_db","todays_sales")
                 for(spName in salesPrefs){
@@ -68,114 +61,73 @@ class AdminActivity : Activity() {
                 }
             }catch(_:Exception){}
 
-            // PRODUCTS - SCAN EVERY POSSIBLE FILE!
             try{
-                val possibleFiles = mutableListOf<String>()
-                // List all shared_prefs files in app directory to find real file
-                try{
-                    val prefsDir = File(filesDir.parent + "/shared_prefs")
-                    if(prefsDir.exists()){
-                        for(f in prefsDir.listFiles()!!){
-                            val name = f.name.replace(".xml","")
-                            possibleFiles.add(name)
-                        }
-                    }
-                }catch(_:Exception){}
-
-                // Add known names
-                possibleFiles.addAll(listOf("products_main","products_rukudzo","stock_main","products_db","products","stock_rukudzo","products_main_branch","stock","inventory","product_list","products_list","SmartPosPrefs","smartpos_products","my_products","shop_products"))
-
+                // SAFE LIST - NO FILE SCAN (this fixes build error)
+                val possibleFiles = listOf(
+                    "products_main","products_rukudzo","stock_main","products_db","products",
+                    "stock_rukudzo","products_main_branch","stock","inventory",
+                    "product_list","products_list","SmartPosPrefs","smartpos_products"
+                )
                 val seen = HashSet<String>()
                 allStockItems.clear()
                 var foundFiles = ""
-
-                for(prefName in possibleFiles.distinct()){
+                for(prefName in possibleFiles){
                     try{
                         val pref = getSharedPreferences(prefName, Context.MODE_PRIVATE)
                         if(pref.all.isEmpty()) continue
-                        // Check if this looks like products (not sales/customers)
-                        var looksLikeProduct = false
-                        for((_,v) in pref.all.take(2)){
-                            val raw = v.toString()
-                            if(raw.contains("|") || raw.trim().startsWith("{")) looksLikeProduct = true
-                        }
-                        if(!looksLikeProduct) continue
-
                         foundFiles += "$prefName=${pref.all.size} "
                         for((k,v) in pref.all){
                             try{
-                                if(seen.contains(k) && k.length>3) continue
-                                // Don't double count same key from different file if already found, but allow if first file empty
+                                if(seen.contains(k)) continue
                                 val raw = v.toString()
                                 if(raw.length<2) continue
                                 var pname = k
                                 var qty = 1
                                 var sell = 0f
-                                var sku = k.take(8)
-
+                                var sku = k.take(8).uppercase()
                                 if(raw.trim().startsWith("{")){
                                     try{
                                         val o = JSONObject(raw)
-                                        pname = o.optString("name", o.optString("productName", o.optString("title", k)))
-                                        sku = o.optString("sku", o.optString("barcode", o.optString("code", k.take(8))))
-                                        qty = o.optInt("quantity", o.optInt("qty", o.optInt("stock", o.optInt("available", 1))))
-                                        sell = o.optDouble("price", o.optDouble("sellPrice", o.optDouble("sellingPrice", o.optDouble("selling_price", 0.0)))).toFloat()
+                                        pname = o.optString("name", o.optString("productName", k))
+                                        sku = o.optString("sku", o.optString("barcode", k.take(8)))
+                                        qty = o.optInt("quantity", o.optInt("qty", 1))
+                                        sell = o.optDouble("price", o.optDouble("sellPrice", 0.0)).toFloat()
                                         val cost = o.optDouble("cost",0.0).toFloat()
                                         if(sell==0f) sell = cost * 1.3f
                                         if(sell==0f) sell = 10f
                                     }catch(_:Exception){ continue }
                                 } else {
-                                    // pipe format - try all variations
                                     val p = raw.split("|")
-                                    if(p.size>=1) pname = p[0]
-                                    if(p.size>=2){
-                                        // could be qty or price
-                                        qty = p[1].toIntOrNull()?: p[2].toIntOrNull()?: 1
-                                        sell = p[1].toFloatOrNull()?: p[2].toFloatOrNull()?: 0f
-                                    }
-                                    if(p.size>=3){
-                                        sell = p[2].toFloatOrNull()?: p[1].toFloatOrNull()?: 0f
-                                        qty = p[1].toIntOrNull()?: p[3].toIntOrNull()?: 1
-                                    }
-                                    if(p.size>=4){
-                                        qty = p[3].toIntOrNull()?: p[1].toIntOrNull()?: 1
-                                    }
+                                    if(p.isNotEmpty()) pname = p[0]
+                                    if(p.size>=2) qty = p[1].toIntOrNull()?:1
+                                    if(p.size>=3) sell = p[2].toFloatOrNull()?:0f
+                                    if(p.size>=4) qty = p[3].toIntOrNull()?:qty
                                     sku = pname.take(8).uppercase()
                                 }
-
                                 if(pname.isBlank()) continue
-                                if(qty<0) qty=0
-                                if(qty==0 && prodCount<200) qty=1 // prevent 0 qty counting as no stock
-
-                                // Only count once
                                 if(!seen.contains(pname)){
                                     seen.add(pname)
                                     seen.add(k)
                                     stockValue += sell * qty
                                     if(qty < 5) lowStock++
                                     prodCount++
-                                    allStockItems.add(StockItem(sku, pname, qty, sell, prefName))
+                                    allStockItems.add(StockItem(sku, pname, qty, sell))
                                 }
                             }catch(_:Exception){}
                         }
                     }catch(_:Exception){}
                 }
                 debugInfo += " | Found: $foundFiles"
-            }catch(e:Exception){ debugInfo += " ProdErr:${e.message}" }
+            }catch(e:Exception){ debugInfo += " Err:${e.message}" }
 
             try{
-                val cPrefs = listOf("customers","customers_db","customer_list","clients","customers_main")
-                for(cName in cPrefs){
-                    try{
-                        val pref = getSharedPreferences(cName, Context.MODE_PRIVATE)
-                        custCount += pref.all.size
-                    }catch(_:Exception){}
+                for(cName in listOf("customers","customers_db","customer_list")){
+                    try{ custCount += getSharedPreferences(cName, Context.MODE_PRIVATE).all.size }catch(_:Exception){}
                 }
             }catch(_:Exception){}
 
             val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
             val drawer = prefsCash.getFloat("drawer", 5.0f)
-
             val autoDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 
             val dateRow = LinearLayout(this).apply {
@@ -190,11 +142,7 @@ class AdminActivity : Activity() {
                 setTextColor(Color.parseColor("#0F172A"))
                 layoutParams = LinearLayout.LayoutParams(0,-2,1f)
             }
-            val txtDateAuto = TextView(this).apply {
-                text = "📅 Today, $autoDate"; textSize = 12f
-                setTextColor(Color.parseColor("#64748B"))
-                setTypeface(null, Typeface.BOLD)
-            }
+            val txtDateAuto = TextView(this).apply { text = "📅 Today, $autoDate"; textSize = 12f; setTextColor(Color.parseColor("#64748B")); setTypeface(null, Typeface.BOLD) }
             val arrow = TextView(this).apply { text = " ▲"; textSize = 14f; setTextColor(Color.parseColor("#0F172A")) }
             dateRow.addView(txtOverview); dateRow.addView(txtDateAuto); dateRow.addView(arrow)
             root.addView(dateRow)
@@ -205,10 +153,9 @@ class AdminActivity : Activity() {
                 isOverviewVisible =!isOverviewVisible
                 overviewContainer.visibility = if(isOverviewVisible) View.VISIBLE else View.GONE
                 arrow.text = if(isOverviewVisible) " ▲" else " ▼"
-                txtOverview.text = if(isOverviewVisible) "Overview (tap to hide)" else "Overview (tap to show)"
             }
 
-            fun kpiCard(bg:String, icon:String, title:String, valueView: TextView, subView: TextView, onClick:()->Unit): LinearLayout {
+            fun kpiCard(bg:String, icon:String, title:String, value:String, sub:String, subColor:String, onClick:()->Unit): LinearLayout {
                 return LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     setBackgroundColor(Color.parseColor(bg))
@@ -218,82 +165,38 @@ class AdminActivity : Activity() {
                     setOnClickListener{ onClick() }
                     addView(TextView(this@AdminActivity).apply { text = icon; textSize = 22f; gravity = Gravity.CENTER })
                     addView(TextView(this@AdminActivity).apply { text = title; textSize = 11f; gravity = Gravity.CENTER; setTextColor(Color.parseColor("#334155")) })
-                    addView(valueView.apply { textSize = 16f; setTypeface(null, Typeface.BOLD); gravity = Gravity.CENTER; setTextColor(Color.parseColor("#0F172A")) })
-                    addView(subView.apply { textSize = 9f; gravity = Gravity.CENTER })
+                    addView(TextView(this@AdminActivity).apply { text = value; textSize = 16f; setTypeface(null, Typeface.BOLD); gravity = Gravity.CENTER; setTextColor(Color.parseColor("#0F172A")) })
+                    addView(TextView(this@AdminActivity).apply { text = sub; textSize = 9f; gravity = Gravity.CENTER; setTextColor(Color.parseColor(subColor)) })
                 }
             }
 
-            txtStockValue = TextView(this).apply{ text = "$"+String.format("%.0f",stockValue) }
-            val subStock = TextView(this).apply{ text = "Selling Price"; setTextColor(Color.parseColor("#7C3AED")) }
-
-            txtProducts = TextView(this).apply{ text = "$prodCount" }
-            val subProd = TextView(this).apply{ text = "Active SKUs"; setTextColor(Color.parseColor("#0F172A")) }
-
-            txtCustomers = TextView(this).apply{ text = "$custCount" }
-            val subCust = TextView(this).apply{ text = if(custCount>0) "REAL" else "Tap to add"; setTextColor(Color.parseColor("#EA580C")) }
-
-            txtLowStock = TextView(this).apply{ text = if(lowStock>0) "$lowStock Items" else "0 Items" }
-            txtLowSub = TextView(this).apply{ text = if(lowStock>0) "Needs restock" else "All OK"; setTextColor(if(lowStock>0) Color.parseColor("#DC2626") else Color.parseColor("#16A34A")) }
-
             val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
-            row1.addView(kpiCard("#BBF7D0","📈","Today's Sales", TextView(this).apply{ text="$${String.format("%.2f",todaySales)}" }, TextView(this).apply{ text="+ REAL"; setTextColor(Color.parseColor("#16A34A")) }){ openSection("Sales Management") })
-            row1.addView(kpiCard("#BFDBFE","💰","Profit", TextView(this).apply{ text="$${String.format("%.2f",profit)}" }, TextView(this).apply{ text="REAL PROFIT"; setTextColor(Color.parseColor("#2563EB")) }){ openSection("Reports") })
-            row1.addView(kpiCard("#DDD6FE","🏠","Stock Value", txtStockValue, subStock){
-                if(prodCount==0){
-                    Toast.makeText(this, "No stock found! Debug: $debugInfo", Toast.LENGTH_LONG).show()
-                    // Open view stock to see where products are
-                    safeOpen(StockListActivity::class.java)
-                } else {
-                    // Show stock value breakdown
-                    val msg = "Total Stock Value: $${String.format("%.2f",stockValue)}\n${prodCount} products\nAvg: $${String.format("%.2f", if(prodCount>0) stockValue/prodCount else 0f)} per SKU\n\nFiles: $debugInfo"
-                    android.app.AlertDialog.Builder(this).setTitle("Stock Value - REAL DATA").setMessage(msg).setPositiveButton("View Stock"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
-                }
+            row1.addView(kpiCard("#BBF7D0","📈","Today's Sales","$${String.format("%.2f",todaySales)}","+ REAL","#16A34A"){ openSection("Sales Management") })
+            row1.addView(kpiCard("#BFDBFE","💰","Profit","$${String.format("%.2f",profit)}","REAL PROFIT","#2563EB"){ openSection("Reports") })
+            row1.addView(kpiCard("#DDD6FE","🏠","Stock Value","$${String.format("%.0f",stockValue)}","Tap → Details","#7C3AED"){
+                val msg = "Total Stock Value: $${String.format("%.2f",stockValue)}\n${prodCount} products\n${debugInfo}"
+                android.app.AlertDialog.Builder(this).setTitle("Stock Value").setMessage(msg).setPositiveButton("View Stock"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
             })
 
             val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,12) }
-            row2.addView(kpiCard(if(lowStock>0)"#FECACA" else "#BBF7D0", if(lowStock>0)"⚠️" else "✅","Low Stock", txtLowStock, txtLowSub){
-                if(lowStock==0 && prodCount==0){
-                    Toast.makeText(this, "No products to check! Add products first. Debug: $debugInfo", Toast.LENGTH_LONG).show()
-                    safeOpen(StockListActivity::class.java)
-                } else if(lowStock==0){
-                    Toast.makeText(this, "✅ All ${prodCount} products have 5+ qty!", Toast.LENGTH_SHORT).show()
-                } else {
-                    var lowList = ""
-                    for(item in allStockItems.filter{it.qty<5}.take(10)){
-                        lowList += "${item.name}: ${item.qty} left\n"
-                    }
-                    android.app.AlertDialog.Builder(this).setTitle("⚠️ Low Stock - $lowStock Items").setMessage(lowList+"\nTap RECEIVE STOCK to restock").setPositiveButton("Restock"){_,_-> safeOpen(ReceiveStockActivity::class.java)}.setNegativeButton("Close",null).show()
-                }
+            row2.addView(kpiCard(if(lowStock>0)"#FECACA" else "#BBF7D0", if(lowStock>0)"⚠️" else "✅","Low Stock", if(lowStock>0) "$lowStock Items" else "0 Items", if(lowStock>0)"Needs restock" else "All OK", if(lowStock>0)"#DC2626" else "#16A34A"){
+                var lowList = ""
+                for(item in allStockItems.filter{it.qty<5}.take(10)){ lowList += "${item.name}: ${item.qty}\n" }
+                if(lowList.isEmpty() && prodCount>0) lowList = "All ${prodCount} products OK (5+ qty)"
+                if(prodCount==0) lowList = "No products found\n$debugInfo"
+                android.app.AlertDialog.Builder(this).setTitle("Low Stock").setMessage(lowList).setPositiveButton("Restock"){_,_-> safeOpen(ReceiveStockActivity::class.java)}.setNegativeButton("Close",null).show()
             })
-            row2.addView(kpiCard("#A5F3FC","📦","Products", txtProducts, subProd){
-                if(prodCount==0){
-                    Toast.makeText(this, "No products found! Checking files: $debugInfo", Toast.LENGTH_LONG).show()
-                    safeOpen(StockListActivity::class.java)
-                } else {
-                    var prodList = ""
-                    for(item in allStockItems.take(15)){
-                        prodList += "${item.sku} - ${item.name} (${item.qty})\n"
-                    }
-                    android.app.AlertDialog.Builder(this).setTitle("📦 Products - ${prodCount} SKUs").setMessage(prodList+"\nFile source: $debugInfo").setPositiveButton("View All"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
-                }
+            row2.addView(kpiCard("#A5F3FC","📦","Products","$prodCount","Tap → SKUs","#0F172A"){
+                var list = ""
+                for(item in allStockItems.take(15)){ list += "${item.sku} - ${item.name} (${item.qty})\n" }
+                if(list.isEmpty()) list = "No products\n$debugInfo"
+                android.app.AlertDialog.Builder(this).setTitle("Products $prodCount SKUs").setMessage(list).setPositiveButton("View All"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
             })
-            row2.addView(kpiCard("#FED7AA","👥","Customers", txtCustomers, subCust){
-                if(custCount==0){
-                    Toast.makeText(this, "No customers yet - Tap to add first customer", Toast.LENGTH_SHORT).show()
-                }
-                safeOpen(CustomersActivity::class.java)
-            })
+            row2.addView(kpiCard("#FED7AA","👥","Customers","$custCount", if(custCount>0) "REAL" else "Tap to add","#EA580C"){ safeOpen(CustomersActivity::class.java) })
 
-            overviewContainer.addView(row1); overviewContainer.addView(row2)
-
-            // DEBUG BOX - Shows where data was found
-            val debugBox = TextView(this).apply{
-                text = "DEBUG: $debugInfo\nFound ${allStockItems.size} items"
-                textSize=9f; setTextColor(Color.GRAY); setPadding(16,8,16,8)
-                setBackgroundColor(Color.parseColor("#F1F5F9"))
-            }
-            overviewContainer.addView(debugBox)
-
+            overviewContainer.addView(row1)
+            overviewContainer.addView(row2)
+            overviewContainer.addView(TextView(this).apply{ text="DEBUG: $debugInfo | Items:${allStockItems.size}"; textSize=9f; setTextColor(Color.GRAY); setPadding(16,8,16,8); setBackgroundColor(Color.parseColor("#F1F5F9")) })
             root.addView(overviewContainer)
 
             root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
