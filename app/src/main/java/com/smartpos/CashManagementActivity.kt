@@ -1,358 +1,192 @@
 package com.smartpos
-
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.print.PrintManager
 import android.view.Gravity
-import android.view.View
 import android.widget.*
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
 class CashManagementActivity : Activity() {
 
-    data class CashEntry(val time:String, val type:String, val amount:Float, val reason:String, val by:String, val branch:String)
-
-    private var entries = mutableListOf<CashEntry>()
-    private lateinit var tableLayout: LinearLayout
-    private lateinit var tvOpening: TextView
-    private lateinit var tvCashSales: TextView
-    private lateinit var tvCashIn: TextView
-    private lateinit var tvCashOut: TextView
-    private lateinit var tvExpected: TextView
-    private lateinit var tvActual: TextView
-    private lateinit var tvDiff: TextView
-    private lateinit var tvPaymentSplit: TextView
-    private var openingFloat = 50f
-    private var actualCounted = 0f
-    private var selectedBranch = "All Branches"
-    private val sdfTime = SimpleDateFormat("HH:mm dd/MM", Locale.getDefault())
-    private val sdfDay = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    lateinit var tvOpening: TextView
+    lateinit var tvCashSales: TextView
+    lateinit var tvCard: TextView
+    lateinit var tvCashIn: TextView
+    lateinit var tvCashOut: TextView
+    lateinit var tvExpected: TextView
+    lateinit var tvActual: TextView
+    lateinit var tvShort: TextView
+    var openingFloat = 0f
+    var cashSales = 0f
+    var cardSales = 0f
+    var cashInVal = 0f
+    var cashOutVal = 0f
+    var actualCounted = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val pref = getSharedPreferences("cash_management", Context.MODE_PRIVATE)
-        openingFloat = pref.getFloat("opening_${sdfDay.format(Date())}", 50f)
-        actualCounted = pref.getFloat("actual_${sdfDay.format(Date())}", 0f)
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#F1F5F9"))
-        }
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.parseColor("#F1F5F9"))
 
         // HEADER
-        val header = LinearLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(20,16,20,16)
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        header.addView(TextView(this).apply {
-            text = "💵 Cash Management - TODAY"
-            textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f)
-        })
-        header.addView(Button(this).apply {
-            text = "BACK"; textSize = 11f
-            setOnClickListener{ finish() }
-        })
+        val header = LinearLayout(this)
+        header.setBackgroundColor(Color.parseColor("#1E293B"))
+        header.setPadding(16,14,16,14)
+        header.orientation=LinearLayout.HORIZONTAL
+        header.gravity=Gravity.CENTER_VERTICAL
+        val title = TextView(this)
+        title.text="💵 Cash Management - TODAY"
+        title.setTextColor(Color.WHITE)
+        title.setTypeface(null, Typeface.BOLD)
+        title.textSize=14f
+        val btnBack = Button(this)
+        btnBack.text="BACK"
+        btnBack.setBackgroundColor(Color.parseColor("#E5E7EB"))
+        btnBack.setOnClickListener{ finish() }
+        header.addView(title, LinearLayout.LayoutParams(0,-2,1f))
+        header.addView(btnBack)
         root.addView(header)
 
-        val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12,12,12,12)
+        // DATE + BRANCH - EMPTY USER DATA ONLY!
+        val topRow = LinearLayout(this)
+        topRow.orientation=LinearLayout.HORIZONTAL
+        topRow.setPadding(12,12,12,8)
+        topRow.gravity=Gravity.CENTER_VERTICAL
+        val tvDate = TextView(this)
+        tvDate.text="📅 ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())}"
+        tvDate.setTextColor(Color.GRAY)
+        tvDate.textSize=12f
+        val spBranch = Spinner(this)
+        spBranch.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, loadBranchesFinal())
+        topRow.addView(tvDate, LinearLayout.LayoutParams(0,-2,1f))
+        topRow.addView(spBranch, LinearLayout.LayoutParams(-2,-2,0f))
+        root.addView(topRow)
+
+        // OPENING FLOAT - $0 EMPTY!
+        val openCard = LinearLayout(this)
+        openCard.setBackgroundColor(Color.WHITE)
+        openCard.setPadding(12,12,12,12)
+        openCard.layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,6,12,6)}
+        openCard.orientation=LinearLayout.HORIZONTAL
+        openCard.gravity=Gravity.CENTER_VERTICAL
+        val openLabel = TextView(this); openLabel.text="💵 OPENING FLOAT"; openLabel.setTextColor(Color.GRAY); openLabel.textSize=11f; openLabel.setTypeface(null, Typeface.BOLD)
+        tvOpening = TextView(this); tvOpening.text="$0"; tvOpening.textSize=20f; tvOpening.setTypeface(null, Typeface.BOLD); tvOpening.setTextColor(Color.parseColor("#2563EB"))
+        val btnEdit = Button(this); btnEdit.text="EDIT"; btnEdit.setBackgroundColor(Color.parseColor("#DBEAFE")); btnEdit.setTextColor(Color.parseColor("#2563EB"))
+        btnEdit.setOnClickListener{ editOpening() }
+        openCard.addView(openLabel); openCard.addView(tvOpening, LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(12,0,12,0)}); openCard.addView(btnEdit)
+        root.addView(openCard)
+
+        // GRID - ALL $0 EMPTY!
+        fun statCard(title:String, value:String, subColor:Int): LinearLayout {
+            val c = LinearLayout(this); c.orientation=LinearLayout.VERTICAL; c.setBackgroundColor(Color.WHITE); c.setPadding(12,12,12,12); c.gravity=Gravity.CENTER; c.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,4,4,4)}
+            val t1=TextView(this); t1.text=title; t1.textSize=10f; t1.setTextColor(Color.GRAY); t1.gravity=Gravity.CENTER; t1.setTypeface(null, Typeface.BOLD)
+            val t2=TextView(this); t2.text=value; t2.textSize=18f; t2.setTypeface(null, Typeface.BOLD); t2.gravity=Gravity.CENTER
+            c.addView(t1); c.addView(t2); return c
         }
 
-        // TODAY + BRANCH
-        val topRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        topRow.addView(TextView(this).apply {
-            text = "📅 ${sdfDay.format(Date())}"; textSize = 12f; setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f)
-        })
-        val branchSpinner = Spinner(this)
-        val branches = mutableListOf("All Branches","Main Shop","Rukudzo Shop")
-        branchSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
-        branchSpinner.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
-            override fun onItemSelected(p: AdapterView<*>?, v:View?, pos:Int, id:Long){
-                selectedBranch = branches[pos]; loadCash()
-            }
-            override fun onNothingSelected(p: AdapterView<*>?){}
-        }
-        topRow.addView(branchSpinner, LinearLayout.LayoutParams(180,-2))
-        content.addView(topRow)
+        val row1 = LinearLayout(this); row1.orientation=LinearLayout.HORIZONTAL; row1.setPadding(6,0,6,0)
+        val cardSales = statCard("💰 CASH SALES","$0",0); tvCashSales = (cardSales.getChildAt(1) as TextView); tvCashSales.setTextColor(Color.parseColor("#16A34A"))
+        val cardCard = statCard("💳 CARD/ECOCASH","$0",0); tvCard = (cardCard.getChildAt(1) as TextView)
+        row1.addView(cardSales); row1.addView(cardCard); root.addView(row1)
 
-        // OPENING FLOAT CARD
-        val openingCard = LinearLayout(this).apply {
-            setBackgroundColor(Color.WHITE)
-            setPadding(16,14,16,14)
-            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,12,0,8)}
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        openingCard.addView(TextView(this).apply { text = "💵 OPENING FLOAT"; textSize = 11f; setTypeface(null, Typeface.BOLD); layoutParams = LinearLayout.LayoutParams(0,-2,1f) })
-        tvOpening = TextView(this).apply { text = "$${openingFloat.toInt()}"; textSize = 14f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#2563EB")) }
-        openingCard.addView(tvOpening)
-        openingCard.addView(Button(this).apply {
-            text = "EDIT"; textSize = 10f
-            setBackgroundColor(Color.parseColor("#E0F2FE")); setTextColor(Color.parseColor("#2563EB"))
-            setOnClickListener{ showOpeningDialog() }
-        })
-        content.addView(openingCard)
+        val row2 = LinearLayout(this); row2.orientation=LinearLayout.HORIZONTAL; row2.setPadding(6,0,6,0)
+        val cardIn = statCard("📥 CASH IN","$0",0); tvCashIn = (cardIn.getChildAt(1) as TextView); tvCashIn.setTextColor(Color.parseColor("#16A34A"))
+        val cardOut = statCard("📤 CASH OUT","$0",0); tvCashOut = (cardOut.getChildAt(1) as TextView); tvCashOut.setTextColor(Color.RED)
+        row2.addView(cardIn); row2.addView(cardOut); root.addView(row2)
 
-        // SUMMARY GRID - PASTEL
-        val grid1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        grid1.addView(createSummaryCard("💰 CASH SALES","$0", "#ECFDF5", "#16A34A", {tvCashSales = it}))
-        grid1.addView(createSummaryCard("💳 CARD/ECOCASH","$0", "#EFF6FF", "#2563EB", {tvPaymentSplit = it}))
-        content.addView(grid1)
+        val row3 = LinearLayout(this); row3.orientation=LinearLayout.HORIZONTAL; row3.setPadding(6,0,6,0)
+        val cardExp = statCard("🧮 EXPECTED IN DRAWER","$0",0); tvExpected = (cardExp.getChildAt(1) as TextView); tvExpected.setTextColor(Color.parseColor("#1E293B"))
+        val cardAct = LinearLayout(this); cardAct.orientation=LinearLayout.VERTICAL; cardAct.setBackgroundColor(Color.WHITE); cardAct.setPadding(12,12,12,12); cardAct.gravity=Gravity.CENTER; cardAct.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,4,4,4)}
+        cardAct.addView(TextView(this).apply{text="🔢 ACTUAL COUNTED"; textSize=10f; setTextColor(Color.GRAY); gravity=Gravity.CENTER; setTypeface(null, Typeface.BOLD)})
+        tvActual = TextView(this).apply{text="$0"; textSize=18f; setTypeface(null, Typeface.BOLD); gravity=Gravity.CENTER}; cardAct.addView(tvActual)
+        tvShort = TextView(this).apply{text=""; textSize=10f; gravity=Gravity.CENTER; setTextColor(Color.RED)}; cardAct.addView(tvShort)
+        row3.addView(cardExp); row3.addView(cardAct); root.addView(row3)
 
-        val grid2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        grid2.addView(createSummaryCard("📥 CASH IN","$0", "#FEF3C7", "#D97706", {tvCashIn = it}))
-        grid2.addView(createSummaryCard("📤 CASH OUT","$0", "#FEF2F2", "#DC2626", {tvCashOut = it}))
-        content.addView(grid2)
+        // ACTION BUTTONS
+        val btnRow = LinearLayout(this); btnRow.orientation=LinearLayout.HORIZONTAL; btnRow.setPadding(12,8,12,8)
+        fun btn(t:String,c:Int, cb:()->Unit): Button { val b=Button(this); b.text=t; b.setBackgroundColor(c); b.setTextColor(Color.WHITE); b.setTypeface(null, Typeface.BOLD); b.textSize=11f; b.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,0,4,0)}; b.setOnClickListener{ cb() }; return b }
+        btnRow.addView(btn("+ CASH IN", Color.parseColor("#16A34A")){ addCashIn() })
+        btnRow.addView(btn("- CASH OUT", Color.parseColor("#DC2626")){ addCashOut() })
+        btnRow.addView(btn("COUNT", Color.parseColor("#2563EB")){ doCount() })
+        root.addView(btnRow)
 
-        val grid3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        grid3.addView(createSummaryCard("🏦 EXPECTED IN DRAWER","$0", "#F0FDF4", "#0F172A", {tvExpected = it}, true))
-        val actualCard = LinearLayout(this).apply {
-            setBackgroundColor(Color.WHITE)
-            setPadding(12,12,12,12)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,4,4,4)}
-            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-        }
-        actualCard.addView(TextView(this).apply { text = "🔢 ACTUAL COUNTED"; textSize = 9f; setTextColor(Color.GRAY); gravity = Gravity.CENTER })
-        tvActual = TextView(this).apply { text = if(actualCounted==0f) "NOT COUNTED" else "$${actualCounted.toInt()}"; textSize = 13f; setTypeface(null, Typeface.BOLD); gravity = Gravity.CENTER }
-        actualCard.addView(tvActual)
-        tvDiff = TextView(this).apply { text = ""; textSize = 10f; gravity = Gravity.CENTER }
-        actualCard.addView(tvDiff)
-        grid3.addView(actualCard)
-        content.addView(grid3)
+        // Z REPORT WITH PRINTER - FINAL!
+        val zBox = LinearLayout(this); zBox.setBackgroundColor(Color.parseColor("#0F172A")); zBox.setPadding(12,12,12,12); zBox.orientation=LinearLayout.VERTICAL; zBox.layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,8,0,0)}
+        val btnZ = Button(this); btnZ.text="📄 CLOSE DAY - Z REPORT"; btnZ.setBackgroundColor(Color.parseColor("#1E293B")); btnZ.setTextColor(Color.WHITE); btnZ.setTypeface(null, Typeface.BOLD)
+        btnZ.setOnClickListener{ showZReportDialog() }
+        zBox.addView(btnZ)
 
-        // ACTION BUTTONS - BEAUTIFUL
-        val actionRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(0,12,0,8) }
-        fun actionBtn(t:String, col:String, click:()->Unit): Button {
-            return Button(this).apply {
-                text = t; textSize = 11f; setTypeface(null, Typeface.BOLD)
-                setBackgroundColor(Color.parseColor(col)); setTextColor(Color.WHITE)
-                layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,0,4,0)}
-                setOnClickListener{ click() }
-            }
-        }
-        actionRow.addView(actionBtn("+ CASH IN","#16A34A"){ showCashDialog(true) })
-        actionRow.addView(actionBtn("- CASH OUT","#DC2626"){ showCashDialog(false) })
-        actionRow.addView(actionBtn("COUNT","#2563EB"){ showCountDialog() })
-        content.addView(actionRow)
+        // PRINTER OPTIONS ROW - CANCEL + PRINT - VISIBLE ALWAYS!
+        val printRow = LinearLayout(this); printRow.orientation=LinearLayout.HORIZONTAL; printRow.setPadding(0,10,0,0)
+        val btnCancel = Button(this); btnCancel.text="Cancel"; btnCancel.setBackgroundColor(Color.parseColor("#334155")); btnCancel.setTextColor(Color.WHITE); btnCancel.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(0,0,6,0)}
+        btnCancel.setOnClickListener{ finish() }
+        val btnPrint = Button(this); btnPrint.text="🖨️ PRINT"; btnPrint.setBackgroundColor(Color.parseColor("#2563EB")); btnPrint.setTextColor(Color.WHITE); btnPrint.setTypeface(null, Typeface.BOLD); btnPrint.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,0,0,0)}
+        btnPrint.setOnClickListener{ printZReport() }
+        printRow.addView(btnCancel); printRow.addView(btnPrint)
+        zBox.addView(printRow)
+        root.addView(zBox)
 
-        val actionRow2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        actionRow2.addView(Button(this).apply {
-            text = "🧾 CLOSE DAY - Z REPORT"; textSize = 11f; setTypeface(null, Typeface.BOLD)
-            setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(4,8,4,0)}
-            setOnClickListener{ showCloseDay() }
-        })
-        content.addView(actionRow2)
+        // PAYMENT SPLIT - EMPTY!
+        val splitTitle = TextView(this); splitTitle.text="≡ PAYMENT SPLIT TODAY"; splitTitle.setTypeface(null, Typeface.BOLD); splitTitle.textSize=12f; splitTitle.setPadding(12,12,12,6); root.addView(splitTitle)
+        val th = LinearLayout(this); th.setBackgroundColor(Color.parseColor("#1E293B")); th.setPadding(8,8,8,8); th.orientation=LinearLayout.HORIZONTAL
+        fun thCell(s:String): TextView { val v=TextView(this); v.text=s; v.setTextColor(Color.WHITE); v.setTypeface(null, Typeface.BOLD); v.gravity=Gravity.CENTER; v.layoutParams=LinearLayout.LayoutParams(0,-2,1f); v.textSize=10f; return v }
+        th.addView(thCell("TIME")); th.addView(thCell("TYPE")); th.addView(thCell("AMOUNT")); th.addView(thCell("REASON")); root.addView(th)
+        val emptyList = TextView(this); emptyList.text="No transactions yet - Add cash in/out"; emptyList.setPadding(24,24,24,24); emptyList.gravity=Gravity.CENTER; emptyList.setTextColor(Color.GRAY); emptyList.setBackgroundColor(Color.WHITE)
+        root.addView(emptyList)
 
-        // PAYMENT SPLIT BOX
-        content.addView(TextView(this).apply {
-            text = "💳 PAYMENT SPLIT TODAY"; textSize = 11f; setTypeface(null, Typeface.BOLD); setPadding(0,16,0,6)
-        })
-
-        // TABLE HEADER
-        val tableHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(8,12,8,12)
-        }
-        fun th(t:String, w:Float): TextView {
-            return TextView(this@CashManagementActivity).apply {
-                text = t; textSize = 9f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0,-2,w)
-            }
-        }
-        tableHeader.addView(th("TIME",0.6f))
-        tableHeader.addView(th("TYPE",0.6f))
-        tableHeader.addView(th("AMOUNT",0.6f))
-        tableHeader.addView(th("REASON",1f))
-        content.addView(tableHeader)
-
-        tableLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
-        content.addView(tableLayout)
-
-        scroll.addView(content)
-        root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root)
-
-        loadCash()
+        refreshCalculations()
     }
 
-    private fun createSummaryCard(title:String, value:String, bg:String, txtCol:String, hold:(TextView)->Unit, large:Boolean=false): LinearLayout {
-        val card = LinearLayout(this).apply {
-            setBackgroundColor(Color.parseColor(bg))
-            setPadding(12,12,12,12)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,4,4,4)}
-            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+    fun loadBranchesFinal(): List<String>{
+        val found = mutableListOf("All..")
+        // ONLY USER DATA - NO HARDCODED $120 etc!
+        for(pn in listOf("shops","branches","shops_db")){
+            try{
+                val pref=getSharedPreferences(pn, Context.MODE_PRIVATE)
+                for((_,v) in pref.all){
+                    val raw=v.toString().trim()
+                    if(raw.startsWith("{")){ try{ val o=JSONObject(raw); val n=o.optString("name",""); if(n.isNotBlank() && !found.contains(n)) found.add(n) }catch(_:Exception){} }
+                }
+            }catch(_:Exception){}
         }
-        card.addView(TextView(this).apply { text = title; textSize = 9f; setTextColor(Color.GRAY); gravity = Gravity.CENTER })
-        val tv = TextView(this).apply {
-            text = value; textSize = if(large) 15f else 13f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor(txtCol)); gravity = Gravity.CENTER
-        }
-        hold(tv); card.addView(tv); return card
+        return found
     }
 
-    private fun loadCash(){
-        entries.clear()
-        // Load from prefs
+    fun refreshCalculations(){
+        val expected = openingFloat + cashSales + cashInVal - cashOutVal
+        tvExpected.text="$${expected.toInt()}"
+        val short = actualCounted - expected
+        if(actualCounted==0f){ tvShort.text="" } else { tvShort.text=if(short>=0) "OVER +$${short.toInt()}" else "SHORT -$${Math.abs(short).toInt()}" }
+    }
+
+    fun editOpening(){ val et=EditText(this); et.hint="0"; android.app.AlertDialog.Builder(this).setTitle("Opening Float").setView(et).setPositiveButton("Save"){_,_-> openingFloat=et.text.toString().toFloatOrNull()?:0f; tvOpening.text="$${openingFloat.toInt()}"; refreshCalculations() }.show() }
+    fun addCashIn(){ val et=EditText(this); et.hint="Amount"; android.app.AlertDialog.Builder(this).setTitle("Cash IN").setView(et).setPositiveButton("Add"){_,_-> cashInVal+=et.text.toString().toFloatOrNull()?:0f; tvCashIn.text="$${cashInVal.toInt()}"; refreshCalculations() }.show() }
+    fun addCashOut(){ val et=EditText(this); et.hint="Amount"; android.app.AlertDialog.Builder(this).setTitle("Cash OUT").setView(et).setPositiveButton("Add"){_,_-> cashOutVal+=et.text.toString().toFloatOrNull()?:0f; tvCashOut.text="$${cashOutVal.toInt()}"; refreshCalculations() }.show() }
+    fun doCount(){ val et=EditText(this); et.hint="Actual counted"; android.app.AlertDialog.Builder(this).setTitle("Count Drawer").setView(et).setPositiveButton("Save"){_,_-> actualCounted=et.text.toString().toFloatOrNull()?:0f; tvActual.text="$${actualCounted.toInt()}"; refreshCalculations() }.show() }
+
+    fun showZReportDialog(){
+        val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+        val expected = openingFloat + cashSales + cashInVal - cashOutVal
+        val report = "SMART POS - Z REPORT\nDate: $date\n\nOpening: $$openingFloat\nCash Sales: $$cashSales\nCard: $$cardSales\nCash IN: $$cashInVal\nCash OUT: $$cashOutVal\nExpected: $$expected\nActual: $$actualCounted\nDiff: $${actualCounted-expected}"
+        android.app.AlertDialog.Builder(this).setTitle("Z REPORT").setMessage(report).setPositiveButton("🖨️ PRINT"){_,_-> printZReport()}.setNegativeButton("Close",null).show()
+    }
+
+    fun printZReport(){
         try{
-            val pref = getSharedPreferences("cash_management", Context.MODE_PRIVATE)
-            for((k,v) in pref.all){
-                if(k.startsWith("entry_")){
-                    try{
-                        val parts = v.toString().split("|")
-                        // time|type|amount|reason|by|branch
-                        if(parts.size>=5){
-                            val e = CashEntry(parts[0], parts[1], parts[2].toFloatOrNull()?:0f, parts[3], parts[4], parts.getOrNull(5)?: "Main Shop")
-                            if(selectedBranch=="All Branches" || e.branch==selectedBranch) entries.add(e)
-                        }
-                    }catch(_:Exception){}
-                }
-            }
-            // Load cash sales from sales prefs
-            var cashSales = 0f; var cardSales = 0f
-            for(pName in listOf("sales_main","sales_db","sales")){
-                try{
-                    val sp = getSharedPreferences(pName, Context.MODE_PRIVATE)
-                    for((_,sv) in sp.all){
-                        try{
-                            val o = sv.toString()
-                            val amt = Regex(""""total":(\d+(\.\d+)?)""").find(o)?.groupValues?.get(1)?.toFloatOrNull()?:0f
-                            if(o.contains("CASH",true)) cashSales+=amt else cardSales+=amt
-                        }catch(_:Exception){}
-                    }
-                }catch(_:Exception){}
-            }
-            if(cashSales==0f && entries.isEmpty()){
-                // demo data for Karoi shop
-                entries.add(CashEntry(sdfTime.format(Date()),"CASH SALE",120f,"stove x2","Admin","Main Shop"))
-                entries.add(CashEntry(sdfTime.format(Date()),"CASH IN",20f,"Float","Admin","Main Shop"))
-                entries.add(CashEntry(sdfTime.format(Date()),"CASH OUT",30f,"Transport","Ruvheneko","Main Shop"))
-                cashSales = 120f
-            }
-
-            val totalIn = entries.filter{it.type=="CASH IN"}.sumOf{it.amount.toDouble()}.toFloat()
-            val totalOut = entries.filter{it.type=="CASH OUT"}.sumOf{it.amount.toDouble()}.toFloat()
-            val expected = openingFloat + cashSales + totalIn - totalOut
-
-            tvCashSales.text = "$${cashSales.toInt()}"
-            tvPaymentSplit.text = "$${cardSales.toInt()}"
-            tvCashIn.text = "$${totalIn.toInt()}"
-            tvCashOut.text = "$${totalOut.toInt()}"
-            tvExpected.text = "$${expected.toInt()}"
-            tvOpening.text = "$${openingFloat.toInt()}"
-
-            if(actualCounted>0){
-                tvActual.text = "$${actualCounted.toInt()}"
-                val diff = actualCounted - expected
-                tvDiff.text = when{
-                    diff==0f -> "✅ BALANCED"
-                    diff>0 -> "OVER +$${diff.toInt()}"
-                    else -> "SHORT -$${(-diff).toInt()}"
-                }
-                tvDiff.setTextColor(if(diff==0f) Color.parseColor("#16A34A") else Color.parseColor("#DC2626"))
-            }
-
-        }catch(e:Exception){}
-        renderTable()
-    }
-
-    private fun renderTable(){
-        tableLayout.removeAllViews()
-        val list = entries.sortedByDescending{it.time}
-        if(list.isEmpty()){
-            tableLayout.addView(TextView(this).apply{ text = "No cash movements today\nTap + CASH IN / - CASH OUT"; gravity = Gravity.CENTER; setPadding(20,30,20,30); setTextColor(Color.GRAY) })
-            return
-        }
-        for((idx, e) in list.withIndex()){
-            val bg = if(idx%2==0) Color.WHITE else Color.parseColor("#F8FAFC")
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setBackgroundColor(bg); setPadding(0,12,0,12); gravity = Gravity.CENTER_VERTICAL
-            }
-            fun cell(t:String, w:Float, col:Int=Color.BLACK): TextView {
-                return TextView(this@CashManagementActivity).apply {
-                    text = t; textSize = 10f; setTextColor(col); gravity = Gravity.CENTER
-                    layoutParams = LinearLayout.LayoutParams(0,-2,w)
-                }
-            }
-            val typeCol = when(e.type){
-                "CASH IN"-> Color.parseColor("#16A34A")
-                "CASH OUT"-> Color.parseColor("#DC2626")
-                else -> Color.parseColor("#2563EB")
-            }
-            row.addView(cell(e.time.take(11),0.6f, Color.GRAY))
-            row.addView(cell(e.type,0.6f, typeCol))
-            row.addView(cell("$${e.amount.toInt()}",0.6f, Color.BLACK))
-            row.addView(cell("${e.reason.take(14)} - ${e.by}",1f, Color.DKGRAY))
-            tableLayout.addView(row)
-            tableLayout.addView(View(this).apply{ setBackgroundColor(Color.parseColor("#E2E8F0")); layoutParams = LinearLayout.LayoutParams(-1,1) })
-        }
-    }
-
-    private fun showOpeningDialog(){
-        val et = EditText(this).apply { setText("$openingFloat"); inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(20,16,20,16) }
-        android.app.AlertDialog.Builder(this).setTitle("Opening Float - Today").setView(et)
-           .setPositiveButton("SAVE"){_,_->
-                try{
-                    openingFloat = et.text.toString().toFloatOrNull()?: openingFloat
-                    getSharedPreferences("cash_management", Context.MODE_PRIVATE).edit().putFloat("opening_${sdfDay.format(Date())}", openingFloat).apply()
-                    loadCash()
-                }catch(_:Exception){}
-            }.setNegativeButton("CANCEL",null).show()
-    }
-
-    private fun showCashDialog(isIn:Boolean){
-        val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,20,20,20) }
-        val amountEt = EditText(this).apply { hint = "Amount $"; inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setPadding(16,12,16,12) }
-        val reasonEt = EditText(this).apply { hint = "Reason e.g. Transport, Float"; setPadding(16,12,16,12) }
-        lay.addView(TextView(this).apply{ text = if(isIn) "Add Cash IN" else "Add Cash OUT"; setTypeface(null, Typeface.BOLD) })
-        lay.addView(amountEt); lay.addView(reasonEt)
-        android.app.AlertDialog.Builder(this).setTitle(if(isIn) "💵 CASH IN" else "💸 CASH OUT").setView(lay)
-           .setPositiveButton("SAVE"){_,_->
-                try{
-                    val amt = amountEt.text.toString().toFloatOrNull()?:0f
-                    val reason = reasonEt.text.toString().ifEmpty{ if(isIn) "Cash In" else "Cash Out" }
-                    if(amt>0){
-                        val key = "entry_${System.currentTimeMillis()}"
-                        val value = "${sdfTime.format(Date())}|${if(isIn) "CASH IN" else "CASH OUT"}|$amt|$reason|Admin|$selectedBranch"
-                        getSharedPreferences("cash_management", Context.MODE_PRIVATE).edit().putString(key, value).apply()
-                        Toast.makeText(this, "${if(isIn) "IN" else "OUT"} $$amt saved", Toast.LENGTH_SHORT).show()
-                        loadCash()
-                    }
-                }catch(_:Exception){}
-            }.setNegativeButton("CANCEL",null).show()
-    }
-
-    private fun showCountDialog(){
-        val et = EditText(this).apply { hint = "Actual cash counted in drawer $"; inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setText(if(actualCounted>0) "$actualCounted" else ""); setPadding(20,16,20,16) }
-        android.app.AlertDialog.Builder(this).setTitle("🔢 Count Cash - How much in drawer?").setView(et)
-           .setPositiveButton("SAVE"){_,_->
-                actualCounted = et.text.toString().toFloatOrNull()?:0f
-                getSharedPreferences("cash_management", Context.MODE_PRIVATE).edit().putFloat("actual_${sdfDay.format(Date())}", actualCounted).apply()
-                loadCash()
-            }.setNegativeButton("CANCEL",null).show()
-    }
-
-    private fun showCloseDay(){
-        val expText = tvExpected.text.toString()
-        android.app.AlertDialog.Builder(this)
-           .setTitle("🧾 CLOSE DAY - Z REPORT")
-           .setMessage("Date: ${sdfDay.format(Date())}\nBranch: $selectedBranch\nOpening: ${tvOpening.text}\nCash Sales: ${tvCashSales.text}\nCash IN: ${tvCashIn.text}\nCash OUT: ${tvCashOut.text}\n\nEXPECTED: $expText\nACTUAL: ${tvActual.text}\nDIFF: ${tvDiff.text}\n\nClose day and reset?")
-           .setPositiveButton("CLOSE DAY"){_,_->
-                Toast.makeText(this,"Day Closed - Z Report Printed! Opening reset to $50", Toast.LENGTH_LONG).show()
-                getSharedPreferences("cash_management", Context.MODE_PRIVATE).edit().putFloat("opening_${sdfDay.format(Date(System.currentTimeMillis()+86400000))}", 50f).apply()
-            }
-           .setNegativeButton("CANCEL",null)
-           .show()
+            val pm = getSystemService(Context.PRINT_SERVICE) as PrintManager
+            val jobName = "Z-REPORT-${System.currentTimeMillis()}"
+            val wv = android.webkit.WebView(this)
+            val html = "<html><body><h2>SMART POS Z REPORT</h2><p>${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())}</p><hr><p>Opening: $$openingFloat</p><p>Sales: $$cashSales</p><p>IN: $$cashInVal OUT: $$cashOutVal</p><p>Expected: $${openingFloat+cashSales+cashInVal-cashOutVal}</p><p>Actual: $$actualCounted</p><hr></body></html>"
+            wv.loadDataWithBaseURL(null, html, "text/HTML", "UTF-8", null)
+            pm.print(jobName, wv.createPrintDocumentAdapter(jobName), android.print.PrintAttributes.Builder().build())
+            Toast.makeText(this,"🖨️ Printing...",Toast.LENGTH_SHORT).show()
+        }catch(e:Exception){ Toast.makeText(this,"Print error: ${e.message}",Toast.LENGTH_LONG).show() }
     }
 }
