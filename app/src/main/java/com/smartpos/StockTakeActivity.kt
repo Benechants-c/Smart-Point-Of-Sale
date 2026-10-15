@@ -37,7 +37,7 @@ class StockTakeActivity : Activity() {
             setPadding(20,16,20,16); gravity=Gravity.CENTER_VERTICAL
         }
         head.addView(TextView(this).apply{
-            text="📦 STOCK TAKE - BUILD 430 REAL DATA"; setTextColor(Color.WHITE); textSize=16f
+            text="STOCK TAKE #430 REAL"; setTextColor(Color.WHITE); textSize=16f
             setTypeface(null,Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
         head.addView(Button(this).apply{
@@ -62,9 +62,9 @@ class StockTakeActivity : Activity() {
             val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
             setText("${sdf.format(Date())} stock take"); setTextColor(Color.BLACK); textSize=16f
         }
-        txtSummary = TextView(this).apply{ text="Loading real products..."; setTextColor(Color.GRAY); textSize=14f; setTypeface(null,Typeface.BOLD) }
-        val btnSave = Button(this).apply{ text="💾 SAVE REAL TAKE"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
-        val btnHistory = Button(this).apply{ text="📜 VIEW SAVED TAKES"; textSize=14f; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE) }
+        txtSummary = TextView(this).apply{ text="Loading REAL products..."; setTextColor(Color.GRAY); textSize=14f; setTypeface(null,Typeface.BOLD) }
+        val btnSave = Button(this).apply{ text="SAVE REAL TAKE"; textSize=14f; setBackgroundColor(Color.parseColor("#16A34A")); setTextColor(Color.WHITE) }
+        val btnHistory = Button(this).apply{ text="VIEW SAVED TAKES"; textSize=14f; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE) }
         topForm.addView(edFileName); topForm.addView(txtSummary); topForm.addView(btnSave); topForm.addView(btnHistory)
         root.addView(topForm)
 
@@ -93,7 +93,7 @@ class StockTakeActivity : Activity() {
         container.removeAllViews(); countedMap.clear()
         productsCache = getAllProducts()
         if(productsCache.isEmpty()){
-            container.addView(TextView(this).apply{ text="No real products - add product in ADD PRODUCT first\nChecked: products_main + products_rukudzo"; textSize=16f; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
+            container.addView(TextView(this).apply{ text="No products found - Check products_main + products_rukudzo"; textSize=16f; gravity=Gravity.CENTER; setPadding(20,20,20,20) }); return
         }
         for(prod in productsCache){
             val id = prod.optString("id"); val name = prod.optString("name","Unknown")
@@ -132,9 +132,9 @@ class StockTakeActivity : Activity() {
             costH+=hand*cost; sellH+=hand*sell; costC+=counted*cost; sellC+=counted*sell
             val v=counted-hand; when{ v<0->neg++; v==0->zero++; else->pos++ }
         }
-        txtValueCost.text="Cost: Hand $${"%.2f".format(costH)} → Counted $${"%.2f".format(costC)}"
-        txtValueSell.text="Sell: Hand $${"%.2f".format(sellH)} → Counted $${"%.2f".format(sellC)} | Profit $${"%.2f".format(sellC-costC)}"
-        txtSummary.text="${productsCache.size} REAL items | 🔴$neg missing 🟢$zero ok 🔵$pos extra"
+        txtValueCost.text="Cost: Hand $${"%.2f".format(costH)} -> Counted $${"%.2f".format(costC)}"
+        txtValueSell.text="Sell: Hand $${"%.2f".format(sellH)} -> Counted $${"%.2f".format(sellC)} | Profit $${"%.2f".format(sellC-costC)}"
+        txtSummary.text="${productsCache.size} REAL items | $neg missing $zero ok $pos extra"
     }
 
     private fun getAllProducts(): List<JSONObject>{
@@ -163,16 +163,12 @@ class StockTakeActivity : Activity() {
                             val price = if(parts.size>2) parts[2].toFloatOrNull()?:0f else if(parts.size>1) parts[1].toFloatOrNull()?:0f else 0f
                             var qty = 1f
                             if(parts.size>3) qty = parts[3].toFloatOrNull()?:1f
-                            norm.put("id",k)
-                            norm.put("name",name)
-                            norm.put("code",k)
+                            norm.put("id",k); norm.put("name",name); norm.put("code",k)
                             norm.put("quantity",qty.toInt())
-                            norm.put("cost",price.toDouble()*0.7)
-                            norm.put("sell",price.toDouble())
+                            norm.put("cost",price.toDouble()*0.7); norm.put("sell",price.toDouble())
                         }
                         if(norm.optString("name").isNotBlank()){
-                            seen.add(k)
-                            list.add(norm)
+                            seen.add(k); list.add(norm)
                         }
                     }catch(_:Exception){}
                 }
@@ -199,7 +195,7 @@ class StockTakeActivity : Activity() {
             mainObj.put("total_cost_value",costC); mainObj.put("total_sell_value",sellC)
             val pref=getSharedPreferences("stock_takes_db", Context.MODE_PRIVATE)
             pref.edit().putString(fileName.lowercase().replace(" ","_")+"_"+System.currentTimeMillis(),mainObj.toString()).apply()
-            Toast.makeText(this,"✅ $fileName SAVED! Cost $${"%.2f".format(costC)} Sell $${"%.2f".format(sellC)}",Toast.LENGTH_LONG).show()
+            Toast.makeText(this,"$fileName SAVED! Cost $${"%.2f".format(costC)} Sell $${"%.2f".format(sellC)}",Toast.LENGTH_LONG).show()
         }catch(e:Exception){ Toast.makeText(this,"Error: ${e.message}",Toast.LENGTH_LONG).show() }
     }
 
@@ -212,10 +208,10 @@ class StockTakeActivity : Activity() {
         for((_,v) in pref.all){
             try{
                 val j=JSONObject(v.toString())
-                sb.append("📁 ${j.optString("fileName")} - ${j.optString("date")}\n Cost $${"%.2f".format(j.optDouble("total_cost_value"))} Sell $${"%.2f".format(j.optDouble("total_sell_value"))}\n\n")
+                sb.append("${j.optString("fileName")} - ${j.optString("date")}\n Cost $${"%.2f".format(j.optDouble("total_cost_value"))} Sell $${"%.2f".format(j.optDouble("total_sell_value"))}\n\n")
             }catch(_:Exception){}
         }
         txt.text=sb.toString(); layout.addView(txt)
-        android.app.AlertDialog.Builder(this).setTitle("📜 Saved (${pref.all.size})").setView(layout).setPositiveButton("OK",null).setNegativeButton("CLEAR ALL"){_,_-> pref.edit().clear().apply() }.show()
+        android.app.AlertDialog.Builder(this).setTitle("Saved (${pref.all.size})").setView(layout).setPositiveButton("OK",null).setNegativeButton("CLEAR ALL"){_,_-> pref.edit().clear().apply() }.show()
     }
 }
