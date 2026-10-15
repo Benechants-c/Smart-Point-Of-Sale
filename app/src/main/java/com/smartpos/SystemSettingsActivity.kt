@@ -1,74 +1,334 @@
 package com.smartpos
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Base64
 import android.view.Gravity
+import android.view.View
 import android.widget.*
-import java.text.SimpleDateFormat
-import java.util.*
+import java.io.ByteArrayOutputStream
 
-class SystemSettingsActivity : Activity() {
-    override fun onCreate(b: Bundle?) {
-        super.onCreate(b)
-        val scroll = ScrollView(this)
-        val root = LinearLayout(this).apply{ orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#F8FAFC")) }
-        
-        val header = TextView(this).apply{ text="⚙️ System Settings - TAX INCLUSIVE"; textSize=18f; setTypeface(null,Typeface.BOLD); setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE); setPadding(20,30,20,24) }
+class SettingsActivity : Activity() {
+
+    private lateinit var menuDropdown: LinearLayout
+    private lateinit var menuButton: Button
+    private lateinit var receiptSection: LinearLayout
+    private lateinit var printerSection: LinearLayout
+    private lateinit var otherSection: LinearLayout
+    private lateinit var logoImage: ImageView
+    private lateinit var receiptPreview: LinearLayout
+    private var menuVisible = false
+    private var logoBase64: String = ""
+    private val PICK_LOGO = 101
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#F1F5F9"))
+        }
+
+        val header = LinearLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            setPadding(20,16,20,16)
+        }
+        header.addView(TextView(this).apply {
+            text = "⚙️ System Settings - TAX INCLUSIVE"
+            textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE)
+        })
         root.addView(header)
 
-        val back = Button(this).apply{ text="← BACK"; setBackgroundColor(Color.parseColor("#E2E8F0")); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,12,12,0)} }
-        back.setOnClickListener{ finish() }; root.addView(back)
-
-        val sysPref = getSharedPreferences("system_settings", Context.MODE_PRIVATE)
-        val receiptPref = getSharedPreferences("receipt_settings", Context.MODE_PRIVATE)
-        val autoDate = SimpleDateFormat("14/10/2026 HH:mm", Locale.getDefault()).format(Date())
-
-        fun title(t:String){ root.addView(TextView(this).apply{text=t; textSize=16f; setTypeface(null,Typeface.BOLD); setPadding(20,24,20,8)}) }
-        fun label(t:String){ root.addView(TextView(this).apply{text=t; textSize=12f; setTextColor(Color.GRAY); setPadding(20,8,20,2)}) }
-        fun input(def:String, hint:String): EditText {
-            val ed = EditText(this).apply{ setText(def); this.hint=hint; setBackgroundColor(Color.WHITE); setPadding(20,16,20,16); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,4,16,8)} }
-            root.addView(ed); return ed
-        }
-        fun btn(text:String, color:String, action:()->Unit){
-            val btn = Button(this).apply{ this.text=text; setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,8,16,8)} }
-            btn.setOnClickListener{ action() }; root.addView(btn)
-        }
-
-        title("🏪 Shop Information")
-        label("Shop Name"); val edShop = input(sysPref.getString("shop_name","Main Shop")!!, "Main Shop")
-        label("Address"); val edAddr = input(sysPref.getString("address","Harare")!!, "Address")
-        label("Phone"); val edPhone = input(sysPref.getString("phone","+263")!!, "Phone")
-
-        title("💰 Currency - TAX INCLUSIVE")
-        label("Currency e.g. $, USD, R, ZiG")
-        val edCurr = input(sysPref.getString("currency","$")!!, "$")
-        root.addView(TextView(this).apply{
-            text="✅ All Prices TAX INCLUSIVE - No extra tax line on receipt"; setBackgroundColor(Color.parseColor("#BBF7D0")); setPadding(16,12,16,12)
-            layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,4,16,8)}
+        root.addView(Button(this).apply {
+            text = "IJ BACK"; textSize = 12f
+            setBackgroundColor(Color.parseColor("#E2E8F0"))
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,12,12,8)}
+            setOnClickListener{ finish() }
         })
 
-        title("🧾 Receipt Layout")
-        label("Receipt Header"); val edHeader = input(receiptPref.getString("header","*** THANK YOU ***")!!, "Header")
-        label("Receipt Footer"); val edFooter = input(receiptPref.getString("footer","Come Again!")!!, "Footer")
+        // DROPPABLE MENU
+        val topMenuBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+            setPadding(12,8,12,8)
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,0,12,8)}
+        }
+        val menuBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        menuButton = Button(this).apply {
+            text = "⚙️ SETTINGS MENU ▼"; textSize = 13f; setTypeface(null, Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#1E293B")); setTextColor(Color.WHITE)
+            setPadding(24,14,24,14)
+            setOnClickListener{
+                menuVisible = !menuVisible
+                menuDropdown.visibility = if(menuVisible) View.VISIBLE else View.GONE
+                text = if(menuVisible) "⚙️ SETTINGS MENU ▲" else "⚙️ SETTINGS MENU ▼"
+            }
+        }
+        menuBar.addView(menuButton, LinearLayout.LayoutParams(-1,-2))
+        topMenuBox.addView(menuBar)
 
-        btn("👁️ PREVIEW RECEIPT - TAX INCLUSIVE","#7C3AED"){
-            val cur = edCurr.text.toString()
-            val preview = "${edShop.text}\n${edAddr.text}\n${edHeader.text}\n----------------\nBread x1 ${cur}2.00\n----------------\nTOTAL: ${cur}2.00\n(Tax Inclusive)\n----------------\n${edFooter.text}\nDate: $autoDate"
-            val tv = TextView(this).apply{text=preview; setPadding(20,20,20,20); typeface=Typeface.MONOSPACE}
-            AlertDialog.Builder(this).setTitle("Receipt Preview").setView(tv).setPositiveButton("OK",null).show()
+        menuDropdown = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; visibility = View.GONE
+            setPadding(8,8,8,8); setBackgroundColor(Color.parseColor("#F8FAFC"))
+        }
+        fun dropBtn(icon:String, title:String, color:String, action:()->Unit): Button {
+            return Button(this).apply {
+                text = "$icon $title"; textSize = 12f; setTypeface(null, Typeface.BOLD)
+                setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE)
+                setPadding(16,18,16,18); gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,4,0,4)}
+                setOnClickListener{
+                    menuDropdown.visibility = View.GONE; menuVisible = false
+                    menuButton.text = "⚙️ SETTINGS MENU ▼"; action()
+                }
+            }
+        }
+        menuDropdown.addView(dropBtn("🧾","RECEIPT SETTINGS","#2563EB"){ showTab("RECEIPT") })
+        menuDropdown.addView(dropBtn("🖨️","PRINTERS","#16A34A"){ showTab("PRINTERS") })
+        menuDropdown.addView(dropBtn("⚙️","OTHER SETTINGS","#334155"){ showTab("OTHER") })
+        topMenuBox.addView(menuDropdown)
+        root.addView(topMenuBox)
+
+        val scroll = ScrollView(this)
+        val scrollContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0,0,0,40) }
+
+        val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        logoBase64 = pref.getString("shop_logo","")?:""
+
+        // 1) RECEIPT SECTION - NOW WITH LOGO + CUSTOMER NAME
+        receiptSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)
+            setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,8,12,8)}
+        }
+        receiptSection.addView(TextView(this).apply {
+            text = "🏪 Shop Information - Customer's Name & Logo"; textSize = 14f
+            setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")); setPadding(0,0,0,12)
+        })
+
+        // LOGO PICKER
+        receiptSection.addView(TextView(this).apply {
+            text = "Shop Logo (Customer's Logo)"; textSize = 12f; setTextColor(Color.GRAY); setPadding(0,0,0,6)
+        })
+        logoImage = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(120,120).apply{gravity = Gravity.CENTER}
+            setBackgroundColor(Color.parseColor("#F1F5F9"))
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            // load saved logo
+            try{
+                if(logoBase64.isNotEmpty()){
+                    val bytes = Base64.decode(logoBase64, Base64.DEFAULT)
+                    val bmp = BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+                    setImageBitmap(bmp)
+                } else {
+                    setImageResource(android.R.drawable.ic_menu_gallery)
+                }
+            }catch(_:Exception){
+                setImageResource(android.R.drawable.ic_menu_gallery)
+            }
+        }
+        receiptSection.addView(logoImage)
+
+        val pickLogoBtn = Button(this).apply {
+            text = "📷 PICK LOGO FROM GALLERY"; textSize = 11f
+            setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,8,0,12)}
+            setOnClickListener{
+                val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                startActivityForResult(intent, PICK_LOGO)
+            }
+        }
+        receiptSection.addView(pickLogoBtn)
+
+        val removeLogoBtn = Button(this).apply {
+            text = "❌ REMOVE LOGO"; textSize = 10f
+            setBackgroundColor(Color.parseColor("#E2E8F0")); setTextColor(Color.BLACK)
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,16)}
+            setOnClickListener{
+                logoBase64 = ""
+                pref.edit().putString("shop_logo","").apply()
+                logoImage.setImageResource(android.R.drawable.ic_menu_gallery)
+                Toast.makeText(this@SettingsActivity,"Logo removed", Toast.LENGTH_SHORT).show()
+                updatePreview()
+            }
+        }
+        receiptSection.addView(removeLogoBtn)
+
+        fun addField(label:String, key:String, def:String): EditText {
+            receiptSection.addView(TextView(this).apply { text = label; textSize = 12f; setTextColor(Color.GRAY); setPadding(0,12,0,4) })
+            val et = EditText(this).apply {
+                setText(pref.getString(key, def)); hint = def
+                setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(16,14,16,14); textSize = 14f
+            }
+            et.setOnFocusChangeListener{_, hasFocus ->
+                if(!hasFocus){
+                    pref.edit().putString(key, et.text.toString()).apply()
+                    updatePreview()
+                }
+            }
+            receiptSection.addView(et)
+            return et
         }
 
-        btn("💾 SAVE ALL SETTINGS","#16A34A"){
-            sysPref.edit().putString("shop_name",edShop.text.toString()).putString("address",edAddr.text.toString()).putString("phone",edPhone.text.toString()).putString("currency",edCurr.text.toString()).putString("tax","0").apply()
-            receiptPref.edit().putString("header",edHeader.text.toString()).putString("footer",edFooter.text.toString()).putBoolean("show_tax",false).apply()
-            Toast.makeText(this,"✅ SAVED! Shop: ${edShop.text} | Currency: ${edCurr.text} | Tax Inclusive",Toast.LENGTH_LONG).show()
-        }
+        val nameEt = addField("Shop Name - Customer's Name (e.g. ruvheneko)","shop_name","ruvheneko")
+        val addressEt = addField("Address (e.g. Karoi, +263773996905)","shop_address","Karoi, +263773996905")
+        val phoneEt = addField("Phone (+263...)","shop_phone","+263773996805")
 
-        root.addView(TextView(this).apply{text="\nDate: $autoDate\nAuto Device Date Enabled\nTAX INCLUSIVE MODE\n"; gravity=Gravity.CENTER; setPadding(20,20,20,40); setTextColor(Color.GRAY)})
-        scroll.addView(root); setContentView(scroll)
+        receiptSection.addView(TextView(this).apply {
+            text = "💰 Currency - TAX INCLUSIVE"; textSize = 13f; setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#0F172A")); setPadding(0,20,0,4)
+        })
+        val currencyEt = addField("Currency e.g. $, USD, R, ZiG","currency","$")
+        val footerEt = addField("Receipt Footer (Thank you message)","receipt_footer","Thank you! Come again")
+
+        // LIVE RECEIPT PREVIEW WITH LOGO + NAME
+        receiptSection.addView(TextView(this).apply {
+            text = "🧾 RECEIPT PREVIEW - How customer will see it"; textSize = 12f
+            setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#16A34A")); setPadding(0,20,0,8)
+        })
+
+        receiptPreview = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+            setPadding(16,16,16,16)
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,12)}
+        }
+        // border
+        setBackgroundDrawable(null)
+
+        val previewBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#FFFFFF"))
+            setPadding(12,12,12,12)
+        }
+        previewBox.addView(receiptPreview)
+        receiptSection.addView(previewBox)
+
+        // Update preview when typing
+        val watcher = object: android.text.TextWatcher{
+            override fun afterTextChanged(s: android.text.Editable?){ updatePreview() }
+            override fun beforeTextChanged(s: CharSequence?, st:Int, c:Int, a:Int){}
+            override fun onTextChanged(s: CharSequence?, st:Int, b:Int, c:Int){}
+        }
+        nameEt.addTextChangedListener(watcher)
+        addressEt.addTextChangedListener(watcher)
+        phoneEt.addTextChangedListener(watcher)
+
+        scrollContent.addView(receiptSection)
+
+        // 2) PRINTERS SECTION
+        printerSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)
+            setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,8,12,8)}
+            visibility = View.GONE
+        }
+        printerSection.addView(TextView(this).apply {
+            text = "🖨️ Printers"; textSize = 14f; setTypeface(null, Typeface.BOLD)
+        })
+        printerSection.addView(Button(this).apply {
+            text = "🖨️ TEST PRINT WITH LOGO + NAME"; setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,16,0,0)}
+            setOnClickListener{ Toast.makeText(this@SettingsActivity,"Printing receipt with ${pref.getString("shop_name","")} + logo", Toast.LENGTH_SHORT).show() }
+        })
+        scrollContent.addView(printerSection)
+
+        // 3) OTHER SETTINGS
+        otherSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE)
+            setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,8,12,8)}
+            visibility = View.GONE
+        }
+        otherSection.addView(TextView(this).apply { text = "⚙️ Other Settings"; textSize = 14f; setTypeface(null, Typeface.BOLD) })
+        scrollContent.addView(otherSection)
+
+        scroll.addView(scrollContent)
+        root.addView(scroll)
+        setContentView(root)
+
+        showTab("RECEIPT")
+        updatePreview()
+    }
+
+    private fun updatePreview(){
+        try{
+            val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val name = pref.getString("shop_name","ruvheneko")?:"ruvheneko"
+            val address = pref.getString("shop_address","Karoi")?:"Karoi"
+            val phone = pref.getString("shop_phone","+263")?:"+263"
+            val currency = pref.getString("currency","$")?:"$"
+            val footer = pref.getString("receipt_footer","Thank you!")?:"Thank you!"
+
+            receiptPreview.removeAllViews()
+
+            // Logo in preview
+            if(logoBase64.isNotEmpty()){
+                try{
+                    val bytes = Base64.decode(logoBase64, Base64.DEFAULT)
+                    val bmp = BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+                    val iv = ImageView(this).apply {
+                        setImageBitmap(bmp)
+                        layoutParams = LinearLayout.LayoutParams(80,80).apply{gravity = Gravity.CENTER}
+                    }
+                    receiptPreview.addView(iv)
+                }catch(_:Exception){}
+            }
+
+            fun txt(t:String, bold:Boolean=false, size:Float=12f, color:String="#000000"): TextView {
+                return TextView(this).apply {
+                    text = t; textSize = size
+                    if(bold) setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.parseColor(color)); gravity = Gravity.CENTER
+                    setPadding(0,2,0,2)
+                }
+            }
+
+            receiptPreview.addView(txt(name, true, 16f, "#0F172A"))
+            receiptPreview.addView(txt(address, false, 10f, "#64748B"))
+            receiptPreview.addView(txt(phone, false, 10f, "#64748B"))
+            receiptPreview.addView(View(this).apply{
+                setBackgroundColor(Color.parseColor("#000000"))
+                layoutParams = LinearLayout.LayoutParams(-1,1).apply{setMargins(0,8,0,8)}
+            })
+            receiptPreview.addView(txt("stove x1  $currency 10.00", false, 11f))
+            receiptPreview.addView(txt("TOTAL: $currency 10.00", true, 13f))
+            receiptPreview.addView(View(this).apply{
+                setBackgroundColor(Color.parseColor("#000000"))
+                layoutParams = LinearLayout.LayoutParams(-1,1).apply{setMargins(0,8,0,8)}
+            })
+            receiptPreview.addView(txt(footer, false, 10f, "#16A34A"))
+
+        }catch(e:Exception){}
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?){
+        super.onActivityResult(requestCode, resultCode, data)
+        if(requestCode==PICK_LOGO && resultCode==RESULT_OK && data!=null){
+            try{
+                val uri: Uri? = data.data
+                val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                // compress to base64
+                val baos = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 60, baos)
+                logoBase64 = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
+                getSharedPreferences("settings", Context.MODE_PRIVATE).edit().putString("shop_logo", logoBase64).apply()
+                logoImage.setImageBitmap(bitmap)
+                Toast.makeText(this,"Logo saved! Customer's logo will show on receipt", Toast.LENGTH_SHORT).show()
+                updatePreview()
+            }catch(e:Exception){
+                Toast.makeText(this,"Logo error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showTab(tab:String){
+        receiptSection.visibility = if(tab=="RECEIPT") View.VISIBLE else View.GONE
+        printerSection.visibility = if(tab=="PRINTERS") View.VISIBLE else View.GONE
+        otherSection.visibility = if(tab=="OTHER") View.VISIBLE else View.GONE
     }
 }
