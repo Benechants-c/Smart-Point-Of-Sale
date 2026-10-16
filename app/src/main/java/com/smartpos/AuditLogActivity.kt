@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuditLogActivity : Activity() {
+class AuditTrailActivity : Activity() {
 
     data class LogEntry(val dateTime:String, val type:String, val product:String, val code:String, val qty:Int, val total:Float, val branch:String, val rawTime:Long)
 
@@ -24,7 +24,7 @@ class AuditLogActivity : Activity() {
     lateinit var btnSales: Button
     lateinit var btnStock: Button
     lateinit var tvResult: TextView
-    var currentFilter = "ALL"
+    var currentFilter = "STOCK"
     var selectedBranch = "All Branches"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,31 +33,27 @@ class AuditLogActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.WHITE)
 
-        // HEADER
         val header = LinearLayout(this)
         header.setBackgroundColor(Color.parseColor("#111827"))
         header.setPadding(16,20,16,16)
-        header.orientation=LinearLayout.HORIZONTAL
-        header.addView(TextView(this).apply{ text="IJ Audit Trail - Ultra"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=15f })
+        header.addView(TextView(this).apply{ text="IJ Audit Trail - Ultra"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=15f; setOnClickListener{ finish() } })
         root.addView(header)
 
-        // DATE ROW
+        // DATE
         val dateRow = LinearLayout(this)
         dateRow.orientation=LinearLayout.HORIZONTAL
         dateRow.setPadding(8,8,8,4)
-        fun dateBox(hint:String): LinearLayout{
-            val b=LinearLayout(this); b.orientation=LinearLayout.VERTICAL; b.setBackgroundColor(Color.WHITE); b.setPadding(8,6,8,6)
+        fun dateBox(lbl:String, value:String): LinearLayout{
+            val b=LinearLayout(this); b.orientation=LinearLayout.VERTICAL; b.setPadding(8,6,8,6); b.setBackgroundColor(Color.WHITE)
             b.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-            b.addView(TextView(this).apply{ text=if(hint=="FROM:") "FROM:" else "TO:"; textSize=9f; setTextColor(Color.GRAY) })
-            b.addView(TextView(this).apply{ text=if(hint=="FROM:") "Select Date" else "16/10/2026"; setTypeface(null, Typeface.BOLD); textSize=12f })
-            b.setBackgroundResource(android.R.drawable.editbox_background)
+            b.addView(TextView(this).apply{ text=lbl; textSize=9f; setTextColor(Color.GRAY) })
+            b.addView(TextView(this).apply{ text=value; setTypeface(null, Typeface.BOLD); textSize=12f })
             return b
         }
-        dateRow.addView(dateBox("FROM:"))
-        dateRow.addView(dateBox("TO:"))
+        dateRow.addView(dateBox("FROM:","Select Date"))
+        dateRow.addView(dateBox("TO:","16/10/2026"))
         root.addView(dateRow)
 
-        // BRANCH
         root.addView(TextView(this).apply{ text="Branch:"; textSize=11f; setPadding(12,4,12,2) })
         val spinnerBranch = Spinner(this)
         val branches = mutableListOf("All Branches","Rukudzo Shop","Rukudzo","Main Shop")
@@ -67,13 +63,8 @@ class AuditLogActivity : Activity() {
         }catch(_:Exception){}
         spinnerBranch.adapter=ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
         root.addView(spinnerBranch, LinearLayout.LayoutParams(-1,-2).apply{ setMargins(12,0,12,4) })
-        spinnerBranch.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{
-            override fun onItemSelected(a:AdapterView<*>?, v:android.view.View?, p:Int, id:Long){ selectedBranch=branches[p]; filterLogs() }
-            override fun onNothingSelected(a:AdapterView<*>?){}
-        }
-        root.addView(TextView(this).apply{ text=" Rukudzo Shop"; textSize=10f; setPadding(12,2,12,6); setBackgroundColor(Color.parseColor("#DBEAFE")) })
 
-        // SEARCH - FIXED LIVE BY CODE OR NAME
+        // SEARCH - LIVE BY CODE OR NAME
         val searchBox = LinearLayout(this)
         searchBox.setBackgroundColor(Color.parseColor("#F3F4F6"))
         searchBox.setPadding(12,10,12,10)
@@ -85,45 +76,43 @@ class AuditLogActivity : Activity() {
         searchBox.addView(etSearch)
         root.addView(searchBox)
 
-        // FILTER BUTTONS - FIXED ALL 3 CLICKABLE
+        // BUTTONS - ALL 3 FIXED CLICKABLE
         val btnRow = LinearLayout(this)
         btnRow.orientation=LinearLayout.HORIZONTAL
         btnRow.setPadding(8,0,8,8)
 
-        btnAll = Button(this)
-        btnAll.text="ALL"
+        btnAll = Button(this).apply{ text="ALL"; isEnabled=true; isClickable=true }
         btnAll.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-
-        btnSales = Button(this)
-        btnSales.text="SALES"
+        btnSales = Button(this).apply{ text="SALES"; isEnabled=true; isClickable=true }
         btnSales.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-
-        btnStock = Button(this)
-        btnStock.text="STOCK"
+        btnStock = Button(this).apply{ text="STOCK"; isEnabled=true; isClickable=true }
         btnStock.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
 
-        fun setActive(btn:Button){
+        fun setActive(active:Button){
+            val inactiveBg = Color.parseColor("#E5E7EB")
+            val activeBg = Color.parseColor("#2563EB")
             listOf(btnAll,btnSales,btnStock).forEach{
-                it.setBackgroundColor(Color.parseColor("#E5E7EB"))
+                it.setBackgroundColor(inactiveBg)
                 it.setTextColor(Color.GRAY)
             }
-            btn.setBackgroundColor(Color.WHITE)
-            btn.setTextColor(Color.parseColor("#2563EB"))
+            active.setBackgroundColor(activeBg)
+            active.setTextColor(Color.WHITE)
         }
 
         btnAll.setOnClickListener{ currentFilter="ALL"; setActive(btnAll); filterLogs() }
         btnSales.setOnClickListener{ currentFilter="SALES"; setActive(btnSales); filterLogs() }
         btnStock.setOnClickListener{ currentFilter="STOCK"; setActive(btnStock); filterLogs() }
 
-        setActive(btnStock) // Default STOCK as screenshot
-        currentFilter="STOCK"
-
-        btnRow.addView(btnAll)
-        btnRow.addView(btnSales)
-        btnRow.addView(btnStock)
+        btnRow.addView(btnAll); btnRow.addView(btnSales); btnRow.addView(btnStock)
         root.addView(btnRow)
+        setActive(btnStock)
 
-        // TABLE HEADER
+        spinnerBranch.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{
+            override fun onItemSelected(a:AdapterView<*>?, v:android.view.View?, p:Int, id:Long){ selectedBranch=branches[p]; filterLogs() }
+            override fun onNothingSelected(a:AdapterView<*>?){}
+        }
+
+        // HEADER TABLE
         val hRow = LinearLayout(this)
         hRow.setBackgroundColor(Color.parseColor("#F3F4F6"))
         hRow.setPadding(4,8,4,8)
@@ -139,7 +128,7 @@ class AuditLogActivity : Activity() {
         root.addView(scroll)
 
         tvResult = TextView(this)
-        tvResult.text="Ultra FINAL - clean version - 0 result"
+        tvResult.text="Loading..."
         tvResult.textSize=9f
         tvResult.gravity=Gravity.CENTER
         tvResult.setPadding(0,12,0,12)
@@ -162,9 +151,34 @@ class AuditLogActivity : Activity() {
         allLogs.clear()
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
 
-        // 1. LOAD FROM ALL POSSIBLE LOG PREFS
-        val logPrefs = listOf("audit_logs","sales_logs","stock_logs","activities","transactions","inventory_logs","sales_history","stock_history","logs","audit_trail")
+        // FIX 1: CHECK ALL PRODUCT PREFS FOR STOCK LOGS - qnty, quantity, qty
+        val productPrefs = listOf("products","products_main","products_db","inventory","stock","products_list","items")
+        for(pn in productPrefs){
+            try{
+                val pref=getSharedPreferences(pn, Context.MODE_PRIVATE)
+                for((k,v) in pref.all){
+                    try{
+                        val o=JSONObject(v.toString())
+                        val name=o.optString("name", o.optString("product_name",""))
+                        val code=o.optString("code", o.optString("sku", o.optString("id",k)))
+                        var qty=0
+                        for(qk in listOf("qnty","quantity","qty","stock","current_stock")){
+                            if(o.has(qk)){ qty=o.optString(qk,"0").toIntOrNull()?: o.optInt(qk,0); break }
+                        }
+                        var cost=0f
+                        for(ck in listOf("cost","buying_price","buy_price")){ if(o.has(ck)){ cost=o.optString(ck,"0").toFloatOrNull()?: o.optDouble(ck,0.0).toFloat(); break } }
+                        var price=0f
+                        for(pk in listOf("price","selling_price","sell_price")){ if(o.has(pk)){ price=o.optString(pk,"0").toFloatOrNull()?: o.optDouble(pk,0.0).toFloat(); break } }
+                        if(name.isNotBlank()){
+                            allLogs.add(LogEntry(sdf.format(Date()), "STOCK", name, code, qty, qty*price, "Rukudzo Shop", System.currentTimeMillis()-allLogs.size))
+                        }
+                    }catch(_:Exception){}
+                }
+            }catch(_:Exception){}
+        }
 
+        // FIX 2: CHECK ALL LOG PREFS FOR SALES/STOCK
+        val logPrefs = listOf("audit_logs","sales_logs","stock_logs","activities","transactions","inventory_logs","sales_history","stock_history","logs","audit_trail","sales","receipts","invoices")
         for(pn in logPrefs){
             try{
                 val pref=getSharedPreferences(pn, Context.MODE_PRIVATE)
@@ -173,12 +187,13 @@ class AuditLogActivity : Activity() {
                         val raw=v.toString()
                         if(raw.trim().startsWith("{")){
                             val o=JSONObject(raw)
-                            // FETCH PRODUCT BY CODE OR NAME - ALL KEYS
                             val product = o.optString("product", o.optString("name", o.optString("product_name","")))
                             val code = o.optString("code", o.optString("sku", o.optString("id", o.optString("product_code",k))))
-                            val type = o.optString("type", o.optString("action", if(pn.contains("sale")) "SALE" else "STOCK"))
-                            val qty = o.optString("qty","0").toIntOrNull()?: o.optInt("qty", o.optInt("quantity",0))
-                            val total = o.optString("total","0").toFloatOrNull()?: o.optDouble("total", o.optDouble("amount",0.0)).toFloat()
+                            val type = o.optString("type", o.optString("action", if(pn.contains("sale")) "SALES" else "STOCK"))
+                            var qty=0
+                            for(qk in listOf("qnty","qty","quantity","count")){ if(o.has(qk)){ qty=o.optString(qk,"0").toIntOrNull()?: o.optInt(qk,0); break } }
+                            var total=0f
+                            for(tk in listOf("total","amount","value","price")){ if(o.has(tk)){ total=o.optString(tk,"0").toFloatOrNull()?: o.optDouble(tk,0.0).toFloat(); break } }
                             val branch = o.optString("branch", o.optString("shop","Rukudzo Shop"))
                             val dateStr = o.optString("date", o.optString("datetime", sdf.format(Date())))
                             val time = o.optLong("time", o.optLong("timestamp", System.currentTimeMillis()))
@@ -191,62 +206,57 @@ class AuditLogActivity : Activity() {
             }catch(_:Exception){}
         }
 
-        // 2. ALSO BUILD LOGS FROM CURRENT PRODUCTS AS STOCK IN
-        try{
-            val pref=getSharedPreferences("products", Context.MODE_PRIVATE)
-            for((_,v) in pref.all){
-                try{
-                    val o=JSONObject(v.toString())
-                    val name=o.optString("name","")
-                    val code=o.optString("code","")
-                    val qty=o.optString("qnty","0").toIntOrNull()?: o.optString("quantity","0").toIntOrNull()?:0
-                    if(name.isNotBlank()){
-                        allLogs.add(LogEntry(sdf.format(Date()), "STOCK", name, code, qty, 0f, "Rukudzo Shop", System.currentTimeMillis()))
-                    }
-                }catch(_:Exception){}
-            }
-        }catch(_:Exception){}
-
-        // SORT NEWEST FIRST
         allLogs.sortByDescending{ it.rawTime }
     }
 
     fun filterLogs(){
         val q = etSearch.text.toString().lowercase().trim()
         filtered = allLogs.filter{
-            val branchOk = selectedBranch=="All Branches" || it.branch.contains(selectedBranch, true)
+            val branchOk = selectedBranch=="All Branches" || it.branch.lowercase().contains(selectedBranch.lowercase()) || selectedBranch.lowercase().contains(it.branch.lowercase())
             val typeOk = when(currentFilter){
                 "ALL" -> true
                 "SALES" -> it.type.contains("SALE", true)
-                "STOCK" -> it.type.contains("STOCK", true) || it.type.contains("IN", true) || it.type.contains("ADJUST", true)
+                "STOCK" -> it.type.contains("STOCK", true) || it.type.contains("IN", true) || it.type.contains("ADJUST", true) || it.type.contains("ADD", true)
                 else -> true
             }
-            val searchOk = q.isBlank() || it.product.lowercase().contains(q) || it.code.lowercase().contains(q) || it.type.lowercase().contains(q) || it.branch.lowercase().contains(q)
+            // SEARCH BY CODE OR NAME OR TYPE OR ID
+            val searchOk = q.isBlank() ||
+                    it.product.lowercase().contains(q) ||
+                    it.code.lowercase().contains(q) ||
+                    it.type.lowercase().contains(q) ||
+                    "${it.qty}".contains(q) ||
+                    it.branch.lowercase().contains(q)
+
             branchOk && typeOk && searchOk
         }.toMutableList()
-
         renderLogs()
     }
 
     fun renderLogs(){
         tableList.removeAllViews()
-        for(log in filtered){
-            val row=LinearLayout(this)
-            row.orientation=LinearLayout.HORIZONTAL
-            row.setPadding(4,10,4,10)
-            row.setBackgroundColor(Color.WHITE)
-
-            fun td(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=10f; tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
-
-            row.addView(td(log.dateTime,1.2f).apply{ textSize=8f })
-            row.addView(td(log.type,0.6f).apply{ setTypeface(null, Typeface.BOLD); setTextColor(if(log.type.contains("SALE")) Color.parseColor("#2563EB") else Color.parseColor("#16A34A")) })
-            row.addView(td(log.product,1.0f).apply{ gravity=Gravity.START; setPadding(8,0,0,0) })
-            row.addView(td("${log.qty}",0.5f))
-            row.addView(td("$${log.total}",0.6f))
-
-            tableList.addView(row)
-            tableList.addView(android.view.View(this).apply{ layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB")) })
+        if(filtered.isEmpty()){
+            tableList.addView(TextView(this).apply{
+                text=if(allLogs.isEmpty()) "\nNo logs yet\n\nAdd products or make a sale\nLogs will appear here" else "\nNo match for '${etSearch.text}'\nFilter: $currentFilter"
+                gravity=Gravity.CENTER
+                setPadding(0,40,0,0)
+                setTextColor(Color.GRAY)
+            })
+        } else {
+            for(log in filtered){
+                val row=LinearLayout(this)
+                row.orientation=LinearLayout.HORIZONTAL
+                row.setPadding(4,10,4,10)
+                row.setBackgroundColor(Color.WHITE)
+                fun td(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=10f; tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
+                row.addView(td(log.dateTime,1.2f).apply{ textSize=8f })
+                row.addView(td(log.type,0.6f).apply{ setTypeface(null, Typeface.BOLD); setTextColor(if(log.type.contains("SALE")) Color.parseColor("#2563EB") else Color.parseColor("#16A34A")) })
+                row.addView(td("${log.product}\n(${log.code})",1.0f).apply{ gravity=Gravity.START; setPadding(8,0,0,0); textSize=9f })
+                row.addView(td("${log.qty}",0.5f).apply{ setTypeface(null, Typeface.BOLD) })
+                row.addView(td("$${log.total}",0.6f))
+                tableList.addView(row)
+                tableList.addView(android.view.View(this).apply{ layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB")) })
+            }
         }
-        tvResult.text="Ultra FINAL - clean version - ${filtered.size} result - Filter: $currentFilter - Branch: $selectedBranch"
+        tvResult.text="Ultra FINAL - ${filtered.size}/${allLogs.size} result - Filter: $currentFilter - Branch: $selectedBranch - Search: '${etSearch.text}'"
     }
 }
