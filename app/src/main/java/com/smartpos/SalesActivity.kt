@@ -1,12 +1,9 @@
 package com.smartpos
 import android.app.Activity
-import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
@@ -17,7 +14,7 @@ import java.util.*
 
 class SalesActivity : Activity() {
 
-    data class Product(val code:String, val name:String, var stock:Int, val price:Float, val cost:Float, val shop:String)
+    data class Product(val code:String, val name:String, var stock:Int, val price:Float, val shop:String)
     data class CartItem(var product:Product, var qty:Int)
 
     var products = mutableListOf<Product>()
@@ -25,10 +22,12 @@ class SalesActivity : Activity() {
     var cart = mutableListOf<CartItem>()
     lateinit var productList: LinearLayout
     lateinit var receiptList: LinearLayout
-    lateinit var tvSubtotal: TextView
     lateinit var tvTotal: TextView
+    lateinit var tvSubtotal: TextView
+    lateinit var tvChange: TextView
+    lateinit var etTendered: EditText
     lateinit var etSearch: EditText
-    var shopName = "Rukudzo"
+    lateinit var tvCount: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,28 +38,45 @@ class SalesActivity : Activity() {
         val header = LinearLayout(this)
         header.setBackgroundColor(Color.parseColor("#0F2D6B"))
         header.setPadding(16,20,16,20)
-        header.addView(TextView(this).apply{ text="SMART POS - Cashier"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=14f })
+        header.orientation = LinearLayout.HORIZONTAL
+        header.gravity = Gravity.CENTER_VERTICAL
+        header.addView(TextView(this).apply{ text="🖨️ SMART POS"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=14f; layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
+        header.addView(TextView(this).apply{ text="Cashier: John Mukucha\n${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())}"; setTextColor(Color.WHITE); textSize=10f; gravity=Gravity.END })
         root.addView(header)
 
-        val shopRow = LinearLayout(this)
-        shopRow.setPadding(12,6,12,6)
-        shopRow.addView(TextView(this).apply{ text="Shop: $shopName"; textSize=12f; setTypeface(null, Typeface.BOLD) })
-        root.addView(shopRow)
+        val shopLabel = TextView(this)
+        shopLabel.text = "SHOP"
+        shopLabel.setPadding(16,10,16,2)
+        shopLabel.textSize=10f
+        root.addView(shopLabel)
+
+        val spinnerShop = Spinner(this)
+        spinnerShop.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Main Shop","Rukudzo"))
+        spinnerShop.setBackgroundColor(Color.WHITE)
+        root.addView(spinnerShop, LinearLayout.LayoutParams(-1,-2).apply{ setMargins(12,0,12,8) })
 
         val searchBox = LinearLayout(this)
         searchBox.setBackgroundColor(Color.WHITE)
         searchBox.setPadding(12,8,12,8)
         searchBox.orientation = LinearLayout.HORIZONTAL
         searchBox.gravity = Gravity.CENTER_VERTICAL
-        searchBox.layoutParams = LinearLayout.LayoutParams(-1,-2).apply{ setMargins(12,4,12,8) }
         etSearch = EditText(this)
-        etSearch.hint = "🔍 Search CODE or Name - see STOCK QTY"
+        etSearch.hint = "SEARCH CODE or Name"
         etSearch.setBackgroundColor(Color.TRANSPARENT)
-        etSearch.layoutParams = LinearLayout.LayoutParams(-1,-2,1f)
+        etSearch.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+        val clear = TextView(this).apply{ text="X"; setPadding(12,0,12,0); setOnClickListener{ etSearch.text.clear() } }
+        searchBox.addView(TextView(this).apply{ text="🔍" })
         searchBox.addView(etSearch)
-        root.addView(searchBox)
+        searchBox.addView(clear)
+        root.addView(searchBox, LinearLayout.LayoutParams(-1,-2).apply{ setMargins(12,0,12,4) })
 
-        root.addView(TextView(this).apply{ text="Products (with REAL STOCK QTY)"; setPadding(16,4,16,4); setTypeface(null, Typeface.BOLD); textSize=12f })
+        tvCount = TextView(this)
+        tvCount.setPadding(16,4,16,4)
+        tvCount.textSize=11f
+        tvCount.setTextColor(Color.parseColor("#2563EB"))
+        root.addView(tvCount)
+
+        root.addView(TextView(this).apply{ text="Products"; setPadding(16,4,16,4); setTypeface(null, Typeface.BOLD); textSize=12f })
 
         val scrollProd = ScrollView(this)
         scrollProd.layoutParams = LinearLayout.LayoutParams(-1,0,1f)
@@ -70,33 +86,53 @@ class SalesActivity : Activity() {
         scrollProd.addView(productList)
         root.addView(scrollProd)
 
+        // RECEIPT
         val receiptContainer = LinearLayout(this)
         receiptContainer.setBackgroundColor(Color.parseColor("#FDE047"))
         receiptContainer.setPadding(12,12,12,12)
+        receiptContainer.addView(TextView(this).apply{ text="Virtual Receipt"; setTypeface(null, Typeface.BOLD) })
         receiptList = LinearLayout(this)
         receiptList.orientation = LinearLayout.VERTICAL
-        receiptContainer.addView(TextView(this).apply{ text="Virtual Receipt"; setTypeface(null, Typeface.BOLD) })
         receiptContainer.addView(receiptList)
-
-        val totalRow = LinearLayout(this)
-        totalRow.orientation = LinearLayout.HORIZONTAL
-        totalRow.addView(TextView(this).apply{ text="TOTAL"; setTypeface(null, Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
-        tvTotal = TextView(this).apply{ text="$0"; setTypeface(null, Typeface.BOLD); textSize=18f }
+        
+        val subRow = LinearLayout(this)
+        subRow.addView(TextView(this).apply{ text="Subtotal"; layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
         tvSubtotal = TextView(this).apply{ text="$0" }
-        totalRow.addView(tvTotal)
-        receiptContainer.addView(totalRow)
+        subRow.addView(tvSubtotal)
+        receiptContainer.addView(subRow)
 
-        val btnComplete = Button(this)
-        btnComplete.text = "COMPLETE SALE - Deduct Stock"
-        btnComplete.setBackgroundColor(Color.parseColor("#16A34A"))
-        btnComplete.setTextColor(Color.WHITE)
-        btnComplete.setOnClickListener{ completeSale() }
-        receiptContainer.addView(btnComplete)
+        val totRow = LinearLayout(this)
+        totRow.addView(TextView(this).apply{ text="TOTAL"; setTypeface(null, Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
+        tvTotal = TextView(this).apply{ text="$0"; setTypeface(null, Typeface.BOLD); textSize=16f }
+        totRow.addView(tvTotal)
+        receiptContainer.addView(totRow)
+
+        val tendRow = LinearLayout(this)
+        tendRow.addView(TextView(this).apply{ text="TENDERED:"; setTypeface(null, Typeface.BOLD) })
+        etTendered = EditText(this)
+        etTendered.hint = "$0"
+        etTendered.setBackgroundColor(Color.WHITE)
+        etTendered.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(8,0,0,0) }
+        tendRow.addView(etTendered)
+        receiptContainer.addView(tendRow)
+
+        val chRow = LinearLayout(this)
+        chRow.addView(TextView(this).apply{ text="CHANGE:"; setTypeface(null, Typeface.BOLD); layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
+        tvChange = TextView(this).apply{ text="$0"; setTypeface(null, Typeface.BOLD) }
+        chRow.addView(tvChange)
+        receiptContainer.addView(chRow)
+
+        val btn = Button(this)
+        btn.text = "COMPLETE SALE"
+        btn.setBackgroundColor(Color.parseColor("#16A34A"))
+        btn.setTextColor(Color.WHITE)
+        btn.setOnClickListener{ completeSale() }
+        receiptContainer.addView(btn)
 
         root.addView(receiptContainer)
         setContentView(root)
 
-        loadRealProductsWithStock()
+        loadRealProductsOnly()
         filter("")
 
         etSearch.addTextChangedListener(object: TextWatcher{
@@ -104,11 +140,17 @@ class SalesActivity : Activity() {
             override fun beforeTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
             override fun onTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
         })
+        etTendered.addTextChangedListener(object: TextWatcher{
+            override fun afterTextChanged(s:Editable?){ updateTotals() }
+            override fun beforeTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
+            override fun onTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
+        })
     }
 
-    fun loadRealProductsWithStock(){
+    fun loadRealProductsOnly(){
         products.clear()
-        val prefNames = listOf("products","products_main","products_db","inventory","stock","products_list")
+        // ONLY REAL USER PREFS - NO FAKE FALLBACK!
+        val prefNames = listOf("products","products_main","products_db","inventory","stock","products_list","items","product_list")
 
         for(prefName in prefNames){
             try{
@@ -116,30 +158,25 @@ class SalesActivity : Activity() {
                 for((_,v) in pref.all){
                     try{
                         val o = JSONObject(v.toString())
-                        val qty = when{
-                            o.has("quantity") -> o.optInt("quantity",0)
-                            o.has("qty") -> o.optInt("qty",0)
-                            o.has("stock") -> o.optInt("stock",0)
-                            o.has("current_stock") -> o.optInt("current_stock",0)
-                            else -> o.optInt("quantity",0)
-                        }
+                        val qty = o.optInt("quantity", o.optInt("qty", o.optInt("stock",0)))
                         val code = o.optString("code", o.optString("sku",""))
                         val name = o.optString("name","")
-                        val price = o.optDouble("price",0.0).toFloat()
-                        val cost = o.optDouble("cost",0.0).toFloat()
-                        val shop = o.optString("shop","Rukudzo")
+                        val price = o.optDouble("price", o.optDouble("selling_price",0.0)).toFloat()
+                        val shop = o.optString("shop","Main Shop")
                         if(name.isNotBlank()){
-                            val ex = products.find{ it.code==code && code.isNotBlank() }
-                            if(ex!=null) ex.stock = maxOf(ex.stock, qty) else products.add(Product(code,name,qty,price,cost,shop))
+                            if(!products.any{ it.code==code && code.isNotBlank() }){
+                                products.add(Product(code,name,qty,price,shop))
+                            }
                         }
                     }catch(_:Exception){}
                 }
             }catch(_:Exception){}
         }
+        // NO FAKE DATA HERE! If empty, it stays empty!
     }
 
     fun filter(q:String){
-        val query = q.lowercase().trim()
+        val query = q.trim().lowercase()
         filtered = if(query.isBlank()) products else products.filter{
             it.code.lowercase().contains(query) || it.name.lowercase().contains(query)
         }.toMutableList()
@@ -148,6 +185,19 @@ class SalesActivity : Activity() {
 
     fun renderProducts(){
         productList.removeAllViews()
+        tvCount.text = if(products.isEmpty()) "Products (0) - NO FAKE DATA" else "Products (${filtered.size}) - REAL USER DATA ONLY"
+
+        if(products.isEmpty()){
+            productList.addView(TextView(this).apply{
+                text="\nNo products yet\n\nGo to Add Product screen\nAdd your real products first\n\nNO FAKE TR-01 / Travel Cup\nNO FAKE DATA"
+                gravity = Gravity.CENTER
+                setPadding(0,40,0,0)
+                setTextColor(Color.GRAY)
+                textSize=13f
+            })
+            return
+        }
+
         for(p in filtered){
             val card = LinearLayout(this)
             card.setBackgroundColor(Color.WHITE)
@@ -159,27 +209,23 @@ class SalesActivity : Activity() {
             val left = LinearLayout(this)
             left.orientation = LinearLayout.VERTICAL
             left.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
-
             left.addView(TextView(this).apply{ text="${p.code} ${p.name}"; setTypeface(null, Typeface.BOLD); textSize=12f })
-            // STOCK QTY VISIBLE FOR CASHIER!
-            val tvStock = TextView(this)
-            tvStock.text = "STOCK: ${p.stock} | $${p.price} | ${p.shop}"
-            tvStock.textSize = 11f
-            tvStock.setTextColor(if(p.stock<=0) Color.RED else Color.parseColor("#16A34A"))
-            tvStock.setTypeface(null, Typeface.BOLD)
-            left.addView(tvStock)
-
+            val stockColor = if(p.stock<=0) Color.RED else Color.parseColor("#16A34A")
+            left.addView(TextView(this).apply{
+                text="Stock ${p.stock} $${p.price} Code ${p.code} | ${p.shop}"
+                textSize=11f
+                setTextColor(stockColor)
+                setTypeface(null, Typeface.BOLD)
+            })
             card.addView(left)
 
             val btn = Button(this)
             if(p.stock<=0){
                 btn.text = "OUT OF STOCK"
-                btn.setBackgroundColor(Color.parseColor("#9CA3AF"))
+                btn.setBackgroundColor(Color.GRAY)
                 btn.isEnabled = false
             } else {
-                btn.text = "+ ADD (${p.stock})"
-                btn.setBackgroundColor(Color.parseColor("#2563EB"))
-                btn.setTextColor(Color.WHITE)
+                btn.text = "+ ADD"
                 btn.setOnClickListener{ addToCart(p) }
             }
             card.addView(btn)
@@ -188,7 +234,7 @@ class SalesActivity : Activity() {
     }
 
     fun addToCart(p:Product){
-        if(p.stock<=0){ Toast.makeText(this,"${p.name} OUT OF STOCK!",Toast.LENGTH_SHORT).show(); return }
+        if(p.stock<=0) return
         val ex = cart.find{ it.product.code==p.code }
         if(ex!=null){
             if(ex.qty >= p.stock){ Toast.makeText(this,"Only ${p.stock} left!",Toast.LENGTH_SHORT).show(); return }
@@ -200,50 +246,48 @@ class SalesActivity : Activity() {
     fun renderReceipt(){
         receiptList.removeAllViews()
         var total = 0f
-        for(item in cart){
-            total += item.product.price * item.qty
-            val row = LinearLayout(this)
-            row.addView(TextView(this).apply{ text="${item.product.name} x${item.qty} (Stock left: ${item.product.stock - item.qty}) - $${item.product.price*item.qty}"; layoutParams=LinearLayout.LayoutParams(0,-2,1f) })
-            receiptList.addView(row)
+        for(it in cart){
+            total += it.product.price * it.qty
+            receiptList.addView(TextView(this).apply{ text="${it.product.code} ${it.product.name} x${it.qty} = $${it.product.price*it.qty}" })
         }
-        tvTotal.text = "$$total"
         tvSubtotal.text = "$$total"
+        tvTotal.text = "$$total"
+        updateTotals()
+    }
+
+    fun updateTotals(){
+        val total = cart.sumOf{ (it.product.price*it.qty).toDouble() }.toFloat()
+        val tendered = etTendered.text.toString().toFloatOrNull()?:0f
+        tvChange.text = "$${if(tendered>=total) tendered-total else 0f}"
     }
 
     fun completeSale(){
-        if(cart.isEmpty()) return
-        // Deduct stock from REAL storage
+        if(cart.isEmpty()){ Toast.makeText(this,"Cart empty",Toast.LENGTH_SHORT).show(); return }
+        Toast.makeText(this,"Sale Complete - Stock deducted",Toast.LENGTH_SHORT).show()
+        // Deduct real stock
         for(item in cart){
-            try{
-                for(prefName in listOf("products","products_main","products_db","inventory")){
+            for(prefName in listOf("products","products_main","products_db")){
+                try{
                     val pref = getSharedPreferences(prefName, Context.MODE_PRIVATE)
                     val editor = pref.edit()
                     for((k,v) in pref.all){
                         try{
                             val o = JSONObject(v.toString())
-                            val code = o.optString("code", o.optString("sku",""))
-                            if(code==item.product.code || o.optString("name","")==item.product.name){
-                                val currentQty = when{
-                                    o.has("quantity") -> o.optInt("quantity",0)
-                                    o.has("qty") -> o.optInt("qty",0)
-                                    o.has("stock") -> o.optInt("stock",0)
-                                    else -> 0
-                                }
-                                val newQty = (currentQty - item.qty).coerceAtLeast(0)
-                                if(o.has("quantity")) o.put("quantity", newQty)
-                                if(o.has("qty")) o.put("qty", newQty)
-                                if(o.has("stock")) o.put("stock", newQty)
+                            if(o.optString("code","")==item.product.code){
+                                val cur = o.optInt("quantity", o.optInt("qty",0))
+                                if(o.has("quantity")) o.put("quantity", cur - item.qty)
+                                if(o.has("qty")) o.put("qty", cur - item.qty)
+                                if(o.has("stock")) o.put("stock", cur - item.qty)
                                 editor.putString(k, o.toString())
                             }
                         }catch(_:Exception){}
                     }
                     editor.apply()
-                }
-            }catch(_:Exception){}
+                }catch(_:Exception){}
+            }
         }
-        Toast.makeText(this,"Sale Complete! Stock Deducted!",Toast.LENGTH_LONG).show()
         cart.clear()
-        loadRealProductsWithStock()
+        loadRealProductsOnly()
         filter(etSearch.text.toString())
         renderReceipt()
     }
