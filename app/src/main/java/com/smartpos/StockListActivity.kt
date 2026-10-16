@@ -29,18 +29,16 @@ class StockListActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.WHITE)
 
-        // HEADER
         val header = LinearLayout(this)
         header.setBackgroundColor(Color.parseColor("#1E293B"))
         header.setPadding(16,16,16,16)
         header.orientation = LinearLayout.HORIZONTAL
         header.addView(TextView(this).apply{
-            text="<- Back   View Stock"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=14f
+            text="<- Back View Stock"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=14f
             setOnClickListener{ finish() }
         })
         root.addView(header)
 
-        // SHOP DROPDOWN
         val shopRow = LinearLayout(this)
         shopRow.orientation = LinearLayout.HORIZONTAL
         shopRow.setPadding(16,8,16,8)
@@ -49,7 +47,7 @@ class StockListActivity : Activity() {
         val spinnerShop = Spinner(this)
         val shops = loadShops()
         spinnerShop.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shops)
-        spinnerShop.setSelection(shops.indexOf("Rukudzo").takeIf{ it>=0 } ?: 0)
+        spinnerShop.setSelection(shops.indexOf("Rukudzo").takeIf{ it>=0 }?: 0)
         spinnerShop.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
             override fun onItemSelected(a:AdapterView<*>?, v:android.view.View?, p:Int, id:Long){
                 selectedShop = shops[p]
@@ -60,7 +58,6 @@ class StockListActivity : Activity() {
         shopRow.addView(spinnerShop, LinearLayout.LayoutParams(-1,-2,1f).apply{ setMargins(12,0,0,0) })
         root.addView(shopRow)
 
-        // TOTAL CARDS
         val cardsRow = LinearLayout(this)
         cardsRow.orientation = LinearLayout.HORIZONTAL
         cardsRow.setPadding(8,4,8,4)
@@ -78,26 +75,24 @@ class StockListActivity : Activity() {
 
         tvTotalCost = TextView(this).apply{ text="$0.00"; textSize=14f; setTypeface(null, Typeface.BOLD); gravity=Gravity.CENTER }
         tvTotalSelling = TextView(this).apply{ text="$0.00"; textSize=14f; setTypeface(null, Typeface.BOLD); gravity=Gravity.CENTER }
-        tvProducts = TextView(this).apply{ text="6"; textSize=14f; setTypeface(null, Typeface.BOLD); gravity=Gravity.CENTER }
+        tvProducts = TextView(this).apply{ text="0"; textSize=14f; setTypeface(null, Typeface.BOLD); gravity=Gravity.CENTER }
 
         cardsRow.addView(card("Total Value at COST", tvTotalCost, "#FFCDD2"))
         cardsRow.addView(card("Total Value at SELLING", tvTotalSelling, "#C8E6C9"))
         cardsRow.addView(card("Products", tvProducts, "#BBDEFB"))
         root.addView(cardsRow)
 
-        // SEARCH
         val searchBox = LinearLayout(this)
         searchBox.setBackgroundColor(Color.parseColor("#F1F5F9"))
         searchBox.setPadding(12,8,12,8)
         searchBox.orientation = LinearLayout.HORIZONTAL
         etSearch = EditText(this)
-        etSearch.hint = "🔍 Search name or code..."
+        etSearch.hint = "Search name or code..."
         etSearch.setBackgroundColor(Color.TRANSPARENT)
         etSearch.layoutParams = LinearLayout.LayoutParams(-1,-2,1f)
         searchBox.addView(etSearch)
         root.addView(searchBox)
 
-        // TABLE HEADER
         val headerRow = LinearLayout(this)
         headerRow.setBackgroundColor(Color.parseColor("#E5E7EB"))
         headerRow.setPadding(4,8,4,8)
@@ -107,7 +102,7 @@ class StockListActivity : Activity() {
             tv.layoutParams = LinearLayout.LayoutParams(0,-2,w)
             return tv
         }
-        headerRow.addView(th("SKU /\nCODE", 0.8f))
+        headerRow.addView(th("SKU / CODE", 0.8f))
         headerRow.addView(th("PRODUCT NAME", 1.2f))
         headerRow.addView(th("QTY", 0.5f))
         headerRow.addView(th("COST", 0.6f))
@@ -135,14 +130,14 @@ class StockListActivity : Activity() {
     }
 
     fun loadShops(): List<String>{
-        val list = mutableListOf("All Shops","Rukudzo","Main Shop","Rukudzo Shop")
+        val list = mutableListOf("All Shops","Rukudzo","Main Shop")
         try{
             val pref = getSharedPreferences("shops", Context.MODE_PRIVATE)
             for((_,v) in pref.all){
                 try{
                     val o = JSONObject(v.toString())
                     val n = o.optString("name","")
-                    if(n.isNotBlank() && !list.contains(n)) list.add(n)
+                    if(n.isNotBlank() &&!list.contains(n)) list.add(n)
                 }catch(_:Exception){}
             }
         }catch(_:Exception){}
@@ -151,8 +146,6 @@ class StockListActivity : Activity() {
 
     fun loadRealProducts(){
         allProducts.clear()
-
-        // CHECK ALL POSSIBLE PRODUCT PREFS
         val prefNames = listOf("products","products_main","products_db","inventory","stock","products_list","items")
 
         for(prefName in prefNames){
@@ -161,45 +154,44 @@ class StockListActivity : Activity() {
                 for((_,v) in pref.all){
                     try{
                         val o = JSONObject(v.toString())
-                        // TRY EVERY QTY KEY POSSIBLE!
+
                         val qty = when{
-                            o.has("quantity") -> o.optInt("quantity", o.optString("quantity","0").toIntOrNull()?:0)
-                            o.has("qty") -> o.optInt("qty", o.optString("qty","0").toIntOrNull()?:0)
-                            o.has("stock") -> o.optInt("stock", o.optString("stock","0").toIntOrNull()?:0)
+                            o.has("qnty") -> o.optString("qnty","0").toIntOrNull()?: o.optInt("qnty",0)
+                            o.has("quantity") -> o.optString("quantity","0").toIntOrNull()?: o.optInt("quantity",0)
+                            o.has("qty") -> o.optString("qty","0").toIntOrNull()?: o.optInt("qty",0)
+                            o.has("stock") -> o.optString("stock","0").toIntOrNull()?: o.optInt("stock",0)
                             o.has("current_stock") -> o.optInt("current_stock",0)
                             o.has("available") -> o.optInt("available",0)
-                            o.has("count") -> o.optInt("count",0)
                             else -> 0
                         }
 
                         val sku = o.optString("code", o.optString("sku", o.optString("id","")))
-                        val name = o.optString("name", o.optString("product_name", o.optString("title","")))
-                        val cost = o.optDouble("cost", o.optDouble("buying_price", o.optDouble("buy_price",0.0))).toFloat()
-                        val price = o.optDouble("price", o.optDouble("selling_price", o.optDouble("sell_price",0.0))).toFloat()
-                        val shop = o.optString("shop", o.optString("branch", o.optString("store","Rukudzo")))
+                        val name = o.optString("name", o.optString("product_name",""))
+
+                        val cost = when{
+                            o.has("cost") -> o.optString("cost","0").toFloatOrNull()?: o.optDouble("cost",0.0).toFloat()
+                            o.has("buying_price") -> o.optDouble("buying_price",0.0).toFloat()
+                            o.has("buy_price") -> o.optDouble("buy_price",0.0).toFloat()
+                            else -> 0f
+                        }
+
+                        val price = when{
+                            o.has("price") -> o.optString("price","0").toFloatOrNull()?: o.optDouble("price",0.0).toFloat()
+                            o.has("selling_price") -> o.optDouble("selling_price",0.0).toFloat()
+                            o.has("sell_price") -> o.optDouble("sell_price",0.0).toFloat()
+                            else -> 0f
+                        }
+
+                        val shop = o.optString("shop", o.optString("store","Rukudzo"))
 
                         if(name.isNotBlank()){
-                            // Merge if same SKU exists
                             val existing = allProducts.find{ it.sku.equals(sku, true) && sku.isNotBlank() }
                             if(existing!=null){
                                 existing.qty = maxOf(existing.qty, qty)
                             } else {
-                                allProducts.add(Product(sku.ifBlank{ name.lowercase().take(8) }, name, qty, cost, price, shop))
+                                allProducts.add(Product(sku, name, qty, cost, price, shop))
                             }
                         }
-                    }catch(e:Exception){}
-                }
-            }catch(_:Exception){}
-        }
-
-        // If still 0, try load from sales inventory file
-        if(allProducts.isEmpty()){
-            try{
-                val pref = getSharedPreferences("inventory_data", Context.MODE_PRIVATE)
-                for((_,v) in pref.all){
-                    try{
-                        val o = JSONObject(v.toString())
-                        allProducts.add(Product(o.optString("sku",""), o.optString("name",""), o.optInt("qty",0), 0f, 0f, "Rukudzo"))
                     }catch(_:Exception){}
                 }
             }catch(_:Exception){}
@@ -209,11 +201,10 @@ class StockListActivity : Activity() {
     fun filter(q:String){
         val query = q.lowercase().trim()
         filtered = allProducts.filter{
-            val shopOk = selectedShop=="All Shops" || it.shop.contains(selectedShop, true) || selectedShop.contains(it.shop, true) || it.shop=="Rukudzo"
+            val shopOk = selectedShop=="All Shops" || it.shop.contains(selectedShop, true)
             val searchOk = query.isBlank() || it.name.lowercase().contains(query) || it.sku.lowercase().contains(query)
             shopOk && searchOk
         }.toMutableList()
-
         renderTable()
     }
 
@@ -239,7 +230,6 @@ class StockListActivity : Activity() {
                     tv.setTextColor(if(p.qty<=0) Color.RED else Color.parseColor("#16A34A"))
                     tv.setTypeface(null, Typeface.BOLD)
                 }
-                if(p.sku==text) tv.setTextColor(Color.parseColor("#64748B"))
                 return tv
             }
 
