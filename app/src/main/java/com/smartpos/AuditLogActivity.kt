@@ -1,5 +1,6 @@
 package com.smartpos
 import android.app.Activity
+import android.app.DatePickerDialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -7,6 +8,7 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.View
 import android.widget.*
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -14,18 +16,31 @@ import java.util.*
 
 class AuditLogActivity : Activity() {
 
-    data class LogEntry(val dateTime:String, val type:String, val product:String, val code:String, val qty:Int, val total:Float, val branch:String, val rawTime:Long)
+    data class Log(
+        val date: Date,
+        val dateStr: String,
+        val type: String,
+        val product: String,
+        val code: String,
+        val qty: Int,
+        val total: Float,
+        val branch: String,
+        val id: String
+    )
 
-    var allLogs = mutableListOf<LogEntry>()
-    var filtered = mutableListOf<LogEntry>()
-    lateinit var tableList: LinearLayout
+    var allLogs = mutableListOf<Log>()
+    var filteredLogs = mutableListOf<Log>()
+    lateinit var table: LinearLayout
+    lateinit var tvFrom: TextView
+    lateinit var tvTo: TextView
     lateinit var etSearch: EditText
-    lateinit var btnAll: Button
-    lateinit var btnSales: Button
-    lateinit var btnStock: Button
+    lateinit var spinnerBranch: Spinner
     lateinit var tvResult: TextView
-    var currentFilter = "STOCK"
-    var selectedBranch = "All Branches"
+    var fromDate: Date? = null
+    var toDate: Date? = null
+    var filterType = "SALES"
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val dateTimeFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,172 +48,259 @@ class AuditLogActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.WHITE)
 
-        val header = LinearLayout(this)
-        header.setBackgroundColor(Color.parseColor("#111827"))
-        header.setPadding(16,20,16,16)
-        header.addView(TextView(this).apply{ text="IJ Audit Trail - Ultra"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=15f; setOnClickListener{ finish() } })
-        root.addView(header)
+        root.addView(LinearLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#111827"))
+            setPadding(16,14,16,14)
+            addView(TextView(this@IJ_AuditTrailActivity).apply{ text="SMART POS"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=16f })
+        })
 
-        // DATE
+        root.addView(LinearLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#1F2937"))
+            setPadding(12,10,12,10)
+            addView(TextView(this@IJ_AuditTrailActivity).apply{ text="IJ Audit Trail - Ultra"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=13f })
+        })
+
+        // DATE ROW WITH CALENDAR
         val dateRow = LinearLayout(this)
-        dateRow.orientation=LinearLayout.HORIZONTAL
-        dateRow.setPadding(8,8,8,4)
-        fun dateBox(lbl:String, value:String): LinearLayout{
-            val b=LinearLayout(this); b.orientation=LinearLayout.VERTICAL; b.setPadding(8,6,8,6); b.setBackgroundColor(Color.WHITE)
-            b.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-            b.addView(TextView(this).apply{ text=lbl; textSize=9f; setTextColor(Color.GRAY) })
-            b.addView(TextView(this).apply{ text=value; setTypeface(null, Typeface.BOLD); textSize=12f })
-            return b
-        }
-        dateRow.addView(dateBox("FROM:","Select Date"))
-        dateRow.addView(dateBox("TO:","16/10/2026"))
+        dateRow.orientation = LinearLayout.HORIZONTAL
+        dateRow.setPadding(12,8,12,4)
+
+        val fromBox = LinearLayout(this)
+        fromBox.orientation = LinearLayout.VERTICAL
+        fromBox.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+        fromBox.addView(TextView(this).apply{ text="FROM:"; textSize=10f; setTextColor(Color.GRAY) })
+        tvFrom = TextView(this)
+        tvFrom.text = "Select Date"
+        tvFrom.textSize = 12f
+        tvFrom.setTypeface(null, Typeface.BOLD)
+        tvFrom.setPadding(0,4,0,8)
+        tvFrom.setTextColor(Color.parseColor("#2563EB"))
+        tvFrom.setOnClickListener{ pickDate(true) }
+        fromBox.addView(tvFrom)
+        dateRow.addView(fromBox)
+
+        val toBox = LinearLayout(this)
+        toBox.orientation = LinearLayout.VERTICAL
+        toBox.layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+        toBox.addView(TextView(this).apply{ text="TO:"; textSize=10f; setTextColor(Color.GRAY) })
+        tvTo = TextView(this)
+        tvTo.text = "16/10/2026"
+        tvTo.textSize = 12f
+        tvTo.setTypeface(null, Typeface.BOLD)
+        tvTo.setPadding(0,4,0,8)
+        tvTo.setTextColor(Color.parseColor("#2563EB"))
+        tvTo.setOnClickListener{ pickDate(false) }
+        toBox.addView(tvTo)
+        dateRow.addView(toBox)
+
         root.addView(dateRow)
 
-        root.addView(TextView(this).apply{ text="Branch:"; textSize=11f; setPadding(12,4,12,2) })
-        val spinnerBranch = Spinner(this)
-        val branches = mutableListOf("All Branches","Rukudzo Shop","Rukudzo","Main Shop")
-        try{
-            val pref=getSharedPreferences("shops", Context.MODE_PRIVATE)
-            for((_,v) in pref.all){ try{ val o=JSONObject(v.toString()); val n=o.optString("name",""); if(n.isNotBlank() &&!branches.contains(n)) branches.add(n) }catch(_:Exception){} }
-        }catch(_:Exception){}
-        spinnerBranch.adapter=ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
-        root.addView(spinnerBranch, LinearLayout.LayoutParams(-1,-2).apply{ setMargins(12,0,12,4) })
+        // BRANCH
+        val branchRow = LinearLayout(this)
+        branchRow.setPadding(12,4,12,8)
+        branchRow.addView(TextView(this).apply{ text="Branch:"; textSize=11f; setTextColor(Color.GRAY) })
+        root.addView(branchRow)
 
-        // SEARCH - LIVE BY CODE OR NAME
-        val searchBox = LinearLayout(this)
-        searchBox.setBackgroundColor(Color.parseColor("#F3F4F6"))
-        searchBox.setPadding(12,10,12,10)
-        searchBox.layoutParams=LinearLayout.LayoutParams(-1,-2).apply{ setMargins(8,4,8,8) }
-        etSearch = EditText(this)
-        etSearch.hint="Search product, type, ID..."
-        etSearch.setBackgroundColor(Color.TRANSPARENT)
-        etSearch.layoutParams=LinearLayout.LayoutParams(-1,-2,1f)
-        searchBox.addView(etSearch)
-        root.addView(searchBox)
+        spinnerBranch = Spinner(this)
+        val branches = mutableListOf("All Branches","Rukudzo","Main Shop","Rukudzo Shop")
+        spinnerBranch.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
+        spinnerBranch.layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,0,12,8)}
+        root.addView(spinnerBranch)
 
-        // BUTTONS - ALL 3 FIXED CLICKABLE
-        val btnRow = LinearLayout(this)
-        btnRow.orientation=LinearLayout.HORIZONTAL
-        btnRow.setPadding(8,0,8,8)
-
-        btnAll = Button(this).apply{ text="ALL"; isEnabled=true; isClickable=true }
-        btnAll.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-        btnSales = Button(this).apply{ text="SALES"; isEnabled=true; isClickable=true }
-        btnSales.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-        btnStock = Button(this).apply{ text="STOCK"; isEnabled=true; isClickable=true }
-        btnStock.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{ setMargins(4,0,4,0) }
-
-        fun setActive(active:Button){
-            val inactiveBg = Color.parseColor("#E5E7EB")
-            val activeBg = Color.parseColor("#2563EB")
-            listOf(btnAll,btnSales,btnStock).forEach{
-                it.setBackgroundColor(inactiveBg)
-                it.setTextColor(Color.GRAY)
-            }
-            active.setBackgroundColor(activeBg)
-            active.setTextColor(Color.WHITE)
-        }
-
-        btnAll.setOnClickListener{ currentFilter="ALL"; setActive(btnAll); filterLogs() }
-        btnSales.setOnClickListener{ currentFilter="SALES"; setActive(btnSales); filterLogs() }
-        btnStock.setOnClickListener{ currentFilter="STOCK"; setActive(btnStock); filterLogs() }
-
-        btnRow.addView(btnAll); btnRow.addView(btnSales); btnRow.addView(btnStock)
-        root.addView(btnRow)
-        setActive(btnStock)
-
-        spinnerBranch.onItemSelectedListener=object: AdapterView.OnItemSelectedListener{
-            override fun onItemSelected(a:AdapterView<*>?, v:android.view.View?, p:Int, id:Long){ selectedBranch=branches[p]; filterLogs() }
+        spinnerBranch.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+            override fun onItemSelected(a:AdapterView<*>?, v:View?, p:Int, id:Long){ filterLogs() }
             override fun onNothingSelected(a:AdapterView<*>?){}
         }
 
-        // HEADER TABLE
-        val hRow = LinearLayout(this)
-        hRow.setBackgroundColor(Color.parseColor("#F3F4F6"))
-        hRow.setPadding(4,8,4,8)
-        fun th(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=9f; tv.setTypeface(null, Typeface.BOLD); tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
-        hRow.addView(th("DATE/TIME",1.2f)); hRow.addView(th("TYPE",0.6f)); hRow.addView(th("PRODUCT",1.0f)); hRow.addView(th("QTY",0.5f)); hRow.addView(th("TOTAL",0.6f))
-        root.addView(hRow)
+        // SEARCH
+        etSearch = EditText(this)
+        etSearch.hint = "Search product, type, ID..."
+        etSearch.textSize = 13f
+        etSearch.setBackgroundColor(Color.parseColor("#F3F4F6"))
+        etSearch.setPadding(16,16,16,16)
+        etSearch.layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(8,0,8,8)}
+        root.addView(etSearch)
+
+        // FILTER BUTTONS - ALL / SALES / STOCK
+        val filterRow = LinearLayout(this)
+        filterRow.orientation = LinearLayout.HORIZONTAL
+        filterRow.setPadding(8,0,8,0)
+
+        fun makeFilterBtn(title:String, type:String): Button {
+            val b = Button(this)
+            b.text = title
+            b.textSize = 12f
+            b.setPadding(0,18,0,18)
+            b.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(4,0,4,0)}
+            if(type==filterType){
+                b.setBackgroundColor(Color.parseColor("#2563EB"))
+                b.setTextColor(Color.WHITE)
+            }else{
+                b.setBackgroundColor(Color.parseColor("#E5E7EB"))
+                b.setTextColor(Color.BLACK)
+            }
+            b.setOnClickListener{
+                filterType = type
+                // redraw buttons
+                for(i in 0 until filterRow.childCount){
+                    val btn = filterRow.getChildAt(i) as Button
+                    if(btn.text.toString()==title){
+                        btn.setBackgroundColor(Color.parseColor("#2563EB")); btn.setTextColor(Color.WHITE)
+                    }else{
+                        btn.setBackgroundColor(Color.parseColor("#E5E7EB")); btn.setTextColor(Color.BLACK)
+                    }
+                }
+                filterLogs()
+            }
+            return b
+        }
+
+        filterRow.addView(makeFilterBtn("ALL","ALL"))
+        filterRow.addView(makeFilterBtn("SALES","SALES"))
+        filterRow.addView(makeFilterBtn("STOCK","STOCK"))
+        root.addView(filterRow)
+
+        // TABLE HEADER
+        val th = LinearLayout(this)
+        th.setBackgroundColor(Color.parseColor("#F3F4F6"))
+        th.setPadding(4,8,4,8)
+        fun tht(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=9f; tv.setTypeface(null, Typeface.BOLD); tv.setTextColor(Color.GRAY); tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
+        th.addView(tht("DATE/TIME",1.2f)); th.addView(tht("TYPE",0.6f)); th.addView(tht("PRODUCT",1.0f)); th.addView(tht("QTY",0.5f)); th.addView(tht("TOTAL",0.7f))
+        root.addView(th)
 
         val scroll = ScrollView(this)
-        scroll.layoutParams=LinearLayout.LayoutParams(-1,0,1f)
-        tableList = LinearLayout(this)
-        tableList.orientation=LinearLayout.VERTICAL
-        scroll.addView(tableList)
+        scroll.layoutParams = LinearLayout.LayoutParams(-1,0,1f)
+        table = LinearLayout(this)
+        table.orientation = LinearLayout.VERTICAL
+        scroll.addView(table)
         root.addView(scroll)
 
         tvResult = TextView(this)
-        tvResult.text="Loading..."
-        tvResult.textSize=9f
-        tvResult.gravity=Gravity.CENTER
-        tvResult.setPadding(0,12,0,12)
+        tvResult.textSize = 9f
         tvResult.setTextColor(Color.GRAY)
+        tvResult.setPadding(8,6,8,6)
+        tvResult.gravity = Gravity.CENTER
         root.addView(tvResult)
 
         setContentView(root)
 
-        loadAllLogs()
-        filterLogs()
+        // INIT DATES
+        toDate = Date()
+        tvTo.text = dateFormat.format(toDate!!)
+
+        // Calendar for FROM = 30 days ago
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_MONTH, -30)
+        fromDate = cal.time
+        tvFrom.text = dateFormat.format(fromDate!!)
 
         etSearch.addTextChangedListener(object:TextWatcher{
             override fun afterTextChanged(s:Editable?){ filterLogs() }
             override fun beforeTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
             override fun onTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
         })
+
+        loadAllLogs()
+        filterLogs()
+    }
+
+    fun pickDate(isFrom:Boolean){
+        val cal = Calendar.getInstance()
+        val current = if(isFrom) fromDate else toDate
+        if(current!=null) cal.time = current
+
+        val dp = DatePickerDialog(this, { _, y, m, d ->
+            cal.set(y,m,d)
+            if(isFrom){
+                fromDate = cal.time
+                tvFrom.text = dateFormat.format(fromDate!!)
+            }else{
+                toDate = cal.time
+                // set to end of day
+                cal.set(Calendar.HOUR_OF_DAY, 23)
+                cal.set(Calendar.MINUTE, 59)
+                toDate = cal.time
+                tvTo.text = dateFormat.format(cal.time)
+            }
+            filterLogs()
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+        dp.show()
     }
 
     fun loadAllLogs(){
         allLogs.clear()
-        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        val sdfList = listOf(
+            SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
+            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()),
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()),
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
+            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        )
 
-        // FIX 1: CHECK ALL PRODUCT PREFS FOR STOCK LOGS - qnty, quantity, qty
-        val productPrefs = listOf("products","products_main","products_db","inventory","stock","products_list","items")
-        for(pn in productPrefs){
+        fun parseDate(str:String): Date {
+            for(sdf in sdfList){ try{ return sdf.parse(str)!! }catch(_:Exception){} }
+            return Date()
+        }
+
+        // 1. LOAD SALES - CHECK ALL POSSIBLE PREFS
+        val salesPrefs = listOf("sales","sales_history","pos_sales","transactions","sales_list","invoices","receipts","sales_data","sale_items","orders")
+        for(pn in salesPrefs){
             try{
-                val pref=getSharedPreferences(pn, Context.MODE_PRIVATE)
+                val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
                 for((k,v) in pref.all){
                     try{
-                        val o=JSONObject(v.toString())
-                        val name=o.optString("name", o.optString("product_name",""))
-                        val code=o.optString("code", o.optString("sku", o.optString("id",k)))
-                        var qty=0
-                        for(qk in listOf("qnty","quantity","qty","stock","current_stock")){
-                            if(o.has(qk)){ qty=o.optString(qk,"0").toIntOrNull()?: o.optInt(qk,0); break }
-                        }
-                        var cost=0f
-                        for(ck in listOf("cost","buying_price","buy_price")){ if(o.has(ck)){ cost=o.optString(ck,"0").toFloatOrNull()?: o.optDouble(ck,0.0).toFloat(); break } }
-                        var price=0f
-                        for(pk in listOf("price","selling_price","sell_price")){ if(o.has(pk)){ price=o.optString(pk,"0").toFloatOrNull()?: o.optDouble(pk,0.0).toFloat(); break } }
-                        if(name.isNotBlank()){
-                            allLogs.add(LogEntry(sdf.format(Date()), "STOCK", name, code, qty, qty*price, "Rukudzo Shop", System.currentTimeMillis()-allLogs.size))
-                        }
+                        val s = v.toString()
+                        if(!s.trim().startsWith("{")) continue
+                        val o = JSONObject(s)
+                        val product = o.optString("product_name", o.optString("name", o.optString("product","Sale")))
+                        val code = o.optString("code", o.optString("sku", k))
+                        val qty = o.optInt("qty", o.optInt("quantity", 1))
+                        val total = o.optDouble("total", o.optDouble("amount", o.optDouble("price", 0.0))).toFloat()
+                        val branch = o.optString("branch","All Branches")
+                        val dateStr = o.optString("date", o.optString("time", o.optString("datetime", o.optString("timestamp", dateFormat.format(Date())))))
+                        val date = parseDate(dateStr)
+                        val id = o.optString("id", o.optString("invoice_id", k))
+
+                        allLogs.add(Log(date, dateStr, "SALES", product, code, qty, total, branch, id))
                     }catch(_:Exception){}
                 }
             }catch(_:Exception){}
         }
 
-        // FIX 2: CHECK ALL LOG PREFS FOR SALES/STOCK
-        val logPrefs = listOf("audit_logs","sales_logs","stock_logs","activities","transactions","inventory_logs","sales_history","stock_history","logs","audit_trail","sales","receipts","invoices")
-        for(pn in logPrefs){
+        // 2. LOAD RECEIVED STOCK - CHECK ALL POSSIBLE PREFS
+        val stockPrefs = listOf("received_stock","stock_received","goods_received","grn","purchase_stock","products","inventory","stock","receiving","products_list")
+        for(pn in stockPrefs){
             try{
-                val pref=getSharedPreferences(pn, Context.MODE_PRIVATE)
+                val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
                 for((k,v) in pref.all){
                     try{
-                        val raw=v.toString()
-                        if(raw.trim().startsWith("{")){
-                            val o=JSONObject(raw)
-                            val product = o.optString("product", o.optString("name", o.optString("product_name","")))
-                            val code = o.optString("code", o.optString("sku", o.optString("id", o.optString("product_code",k))))
-                            val type = o.optString("type", o.optString("action", if(pn.contains("sale")) "SALES" else "STOCK"))
-                            var qty=0
-                            for(qk in listOf("qnty","qty","quantity","count")){ if(o.has(qk)){ qty=o.optString(qk,"0").toIntOrNull()?: o.optInt(qk,0); break } }
-                            var total=0f
-                            for(tk in listOf("total","amount","value","price")){ if(o.has(tk)){ total=o.optString(tk,"0").toFloatOrNull()?: o.optDouble(tk,0.0).toFloat(); break } }
-                            val branch = o.optString("branch", o.optString("shop","Rukudzo Shop"))
-                            val dateStr = o.optString("date", o.optString("datetime", sdf.format(Date())))
-                            val time = o.optLong("time", o.optLong("timestamp", System.currentTimeMillis()))
-                            if(product.isNotBlank() || code.isNotBlank()){
-                                allLogs.add(LogEntry(dateStr, type.uppercase(), product.ifBlank{ code }, code, qty, total, branch, time))
+                        val s = v.toString()
+                        if(!s.trim().startsWith("{")) continue
+                        val o = JSONObject(s)
+                        // Avoid duplicate if already counted as sales - check if has received marker
+                        val isStock = o.has("qnty") || o.has("quantity") || o.has("received_qty") || pn.contains("received") || pn.contains("stock") || pn=="products" || pn=="inventory"
+
+                        if(isStock && !pn.contains("sales")){
+                            val product = o.optString("product_name", o.optString("name", o.optString("product","")))
+                            if(product.isBlank() || allLogs.any{ it.id==k && it.type=="STOCK"}) continue
+                            val code = o.optString("code", o.optString("sku", k))
+                            var qty = 0
+                            for(qk in listOf("qnty","quantity","qty","received_qty","stock")){
+                                if(o.has(qk)){ qty = o.optInt(qk, o.optString(qk,"0").toIntOrNull() ?: 0); if(qty!=0) break }
+                            }
+                            val cost = o.optDouble("cost", o.optDouble("buying_price", 0.0)).toFloat()
+                            val total = qty * cost
+                            val branch = o.optString("branch","All Branches")
+                            val dateStr = o.optString("date", o.optString("received_date", dateFormat.format(Date())))
+                            val date = parseDate(dateStr)
+                            val id = k
+
+                            // Only add if looks like stock received, not sales
+                            if(product.isNotBlank()){
+                                // Check if already added as stock
+                                if(allLogs.none{ it.code==code && it.product==product && it.type=="STOCK" && it.qty==qty }){
+                                    allLogs.add(Log(date, dateStr, "STOCK", product, code, qty, total, branch, id))
+                                }
                             }
                         }
                     }catch(_:Exception){}
@@ -206,57 +308,58 @@ class AuditLogActivity : Activity() {
             }catch(_:Exception){}
         }
 
-        allLogs.sortByDescending{ it.rawTime }
+        // Sort by date descending
+        allLogs.sortByDescending{ it.date }
     }
 
     fun filterLogs(){
         val q = etSearch.text.toString().lowercase().trim()
-        filtered = allLogs.filter{
-            val branchOk = selectedBranch=="All Branches" || it.branch.lowercase().contains(selectedBranch.lowercase()) || selectedBranch.lowercase().contains(it.branch.lowercase())
-            val typeOk = when(currentFilter){
-                "ALL" -> true
-                "SALES" -> it.type.contains("SALE", true)
-                "STOCK" -> it.type.contains("STOCK", true) || it.type.contains("IN", true) || it.type.contains("ADJUST", true) || it.type.contains("ADD", true)
-                else -> true
-            }
-            // SEARCH BY CODE OR NAME OR TYPE OR ID
-            val searchOk = q.isBlank() ||
-                    it.product.lowercase().contains(q) ||
-                    it.code.lowercase().contains(q) ||
-                    it.type.lowercase().contains(q) ||
-                    "${it.qty}".contains(q) ||
-                    it.branch.lowercase().contains(q)
+        val branch = try{ (spinnerBranch.selectedItem as String) }catch(_:Exception){ "All Branches" }
 
-            branchOk && typeOk && searchOk
+        filteredLogs = allLogs.filter{ log ->
+            val typeOk = filterType=="ALL" || log.type==filterType
+            val branchOk = branch=="All Branches" || log.branch.contains(branch, true) || branch.contains(log.branch, true)
+            val searchOk = q.isBlank() || log.product.lowercase().contains(q) || log.code.lowercase().contains(q) || log.type.lowercase().contains(q) || log.id.lowercase().contains(q)
+            val dateOk = (fromDate==null || !log.date.before(fromDate)) && (toDate==null || !log.date.after(toDate))
+            typeOk && branchOk && searchOk && dateOk
         }.toMutableList()
-        renderLogs()
+
+        render()
     }
 
-    fun renderLogs(){
-        tableList.removeAllViews()
-        if(filtered.isEmpty()){
-            tableList.addView(TextView(this).apply{
-                text=if(allLogs.isEmpty()) "\nNo logs yet\n\nAdd products or make a sale\nLogs will appear here" else "\nNo match for '${etSearch.text}'\nFilter: $currentFilter"
-                gravity=Gravity.CENTER
-                setPadding(0,40,0,0)
-                setTextColor(Color.GRAY)
-            })
-        } else {
-            for(log in filtered){
-                val row=LinearLayout(this)
-                row.orientation=LinearLayout.HORIZONTAL
+    fun render(){
+        table.removeAllViews()
+        if(filteredLogs.isEmpty()){
+            val empty = LinearLayout(this)
+            empty.orientation = LinearLayout.VERTICAL
+            empty.gravity = Gravity.CENTER
+            empty.setPadding(0,60,0,0)
+            empty.addView(TextView(this).apply{ text="No logs yet"; textSize=14f; setTextColor(Color.GRAY); gravity=Gravity.CENTER })
+            empty.addView(TextView(this).apply{ text="Add products or make a sale\nLogs will appear here"; textSize=12f; setTextColor(Color.parseColor("#9CA3AF")); gravity=Gravity.CENTER; setPadding(0,8,0,0) })
+            table.addView(empty)
+        }else{
+            for(log in filteredLogs){
+                val row = LinearLayout(this)
                 row.setPadding(4,10,4,10)
                 row.setBackgroundColor(Color.WHITE)
-                fun td(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=10f; tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
-                row.addView(td(log.dateTime,1.2f).apply{ textSize=8f })
-                row.addView(td(log.type,0.6f).apply{ setTypeface(null, Typeface.BOLD); setTextColor(if(log.type.contains("SALE")) Color.parseColor("#2563EB") else Color.parseColor("#16A34A")) })
-                row.addView(td("${log.product}\n(${log.code})",1.0f).apply{ gravity=Gravity.START; setPadding(8,0,0,0); textSize=9f })
-                row.addView(td("${log.qty}",0.5f).apply{ setTypeface(null, Typeface.BOLD) })
-                row.addView(td("$${log.total}",0.6f))
-                tableList.addView(row)
-                tableList.addView(android.view.View(this).apply{ layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB")) })
+
+                fun td(t:String,w:Float,bold:Boolean=false,color:Int=Color.BLACK):TextView{
+                    val tv=TextView(this); tv.text=t; tv.textSize=10f; tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); tv.setTextColor(color)
+                    if(bold) tv.setTypeface(null, Typeface.BOLD)
+                    return tv
+                }
+
+                row.addView(td(SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(log.date),1.2f))
+                row.addView(td(log.type,0.6f,true, if(log.type=="SALES") Color.parseColor("#2563EB") else Color.parseColor("#16A34A")))
+                row.addView(TextView(this).apply{ text=log.product; textSize=10f; layoutParams=LinearLayout.LayoutParams(0,-2,1.0f); setPadding(4,0,0,0) })
+                row.addView(td("${log.qty}",0.5f,true))
+                row.addView(td("$${log.total}",0.7f,true))
+
+                table.addView(row)
+                table.addView(View(this).apply{ layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#F3F4F6")) })
             }
         }
-        tvResult.text="Ultra FINAL - ${filtered.size}/${allLogs.size} result - Filter: $currentFilter - Branch: $selectedBranch - Search: '${etSearch.text}'"
+
+        tvResult.text = "Ultra FINAL - ${filteredLogs.size}/${allLogs.size} result - Filter: $filterType - Branch: ${try{spinnerBranch.selectedItem}catch(_:Exception){ "All Branches" }} - Search: '${etSearch.text}'"
     }
 }
