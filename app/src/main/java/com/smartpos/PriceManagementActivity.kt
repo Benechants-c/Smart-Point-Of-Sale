@@ -1,5 +1,4 @@
 package com.smartpos
-
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
@@ -14,312 +13,280 @@ import org.json.JSONObject
 
 class PriceManagementActivity : Activity() {
 
-    data class Prod(val sku:String, val code:String, val name:String, val qty:Int, val cost:Float, val price:Float, val shop:String, val key:String, val prefName:String)
+    data class Product(val code:String, val name:String, val qty:Int, val cost:Float, val sell:Float, val branch:String, val rawJson:String)
 
-    private var allProducts = mutableListOf<Prod>()
-    private var filtered = mutableListOf<Prod>()
-    private lateinit var tableLayout: LinearLayout
-    private lateinit var searchEt: EditText
-    private lateinit var branchSpinner: Spinner
-    private var selectedBranch = "All Branches"
-    private var branches = mutableListOf("All Branches")
+    var all = mutableListOf<Product>()
+    var filtered = mutableListOf<Product>()
+    lateinit var table: LinearLayout
+    lateinit var etSearch: EditText
+    lateinit var spinnerBranch: Spinner
+    var selectedBranch = "All Branches"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.WHITE)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#F1F5F9"))
-        }
-
-        val header = LinearLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(20,16,20,16)
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        header.addView(TextView(this).apply {
-            text = "💰 Price Management - TAX INCLUSIVE"
-            textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+        // HEADER
+        val header = LinearLayout(this)
+        header.setBackgroundColor(Color.parseColor("#111827"))
+        header.setPadding(12,10,12,10)
+        header.orientation = LinearLayout.HORIZONTAL
+        header.addView(TextView(this).apply{
+            text="💰 Price Management - TAX INCLUSIVE"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); textSize=13f
+            layoutParams=LinearLayout.LayoutParams(0,-2,1f)
         })
-        header.addView(Button(this).apply {
-            text = "BACK"; textSize = 11f
+        header.addView(Button(this).apply{
+            text="BACK"; setBackgroundColor(Color.parseColor("#D1D5DB")); setTextColor(Color.BLACK)
+            setPadding(20,8,20,8)
             setOnClickListener{ finish() }
         })
         root.addView(header)
 
-        // SEARCH BAR - BY CODE + NAME
-        val searchBox = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(12,12,12,12)
-            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,12,12,8)}
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        searchBox.addView(TextView(this).apply { text = "🔍"; textSize = 16f; setPadding(0,0,8,0) })
-        searchEt = EditText(this).apply {
-            hint = "Search by CODE, SKU or Name... e.g. STOVE or STOVE-01"
-            textSize = 13f
-            setBackgroundColor(Color.parseColor("#F8FAFC"))
-            setPadding(16,14,16,14)
-            layoutParams = LinearLayout.LayoutParams(0,-2,1f)
-        }
-        searchBox.addView(searchEt)
+        // SEARCH
+        val searchBox = LinearLayout(this)
+        searchBox.setBackgroundColor(Color.WHITE)
+        searchBox.setPadding(12,12,12,12)
+        searchBox.orientation = LinearLayout.HORIZONTAL
+        searchBox.gravity = Gravity.CENTER_VERTICAL
+        searchBox.addView(TextView(this).apply{ text="🔍"; textSize=16f })
+        etSearch = EditText(this)
+        etSearch.hint="Search by CODE, SKU or Name... e.g. STOVE or STOVE-01"
+        etSearch.textSize=11f
+        etSearch.setBackgroundColor(Color.TRANSPARENT)
+        etSearch.layoutParams=LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(8,0,0,0)}
+        searchBox.addView(etSearch)
         root.addView(searchBox)
 
-        // BRANCH FILTER
-        val branchRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(12,8,12,8)
-            layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(12,0,12,8)}
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        branchRow.addView(TextView(this).apply { text = "Branch:"; textSize = 11f; setTypeface(null, Typeface.BOLD); layoutParams = LinearLayout.LayoutParams(80,-2) })
-        branchSpinner = Spinner(this)
-        branchRow.addView(branchSpinner, LinearLayout.LayoutParams(0,-2,1f))
+        // BRANCH
+        val branchRow = LinearLayout(this)
+        branchRow.setPadding(12,4,12,8)
+        branchRow.gravity=Gravity.CENTER_VERTICAL
+        branchRow.addView(TextView(this).apply{ text="Branch:"; textSize=12f; setTextColor(Color.GRAY); setTypeface(null, Typeface.BOLD) })
+        spinnerBranch = Spinner(this)
+        val branches = mutableListOf("All Branches","Rukudzo","Main Shop")
+        try{
+            val p=getSharedPreferences("shops", Context.MODE_PRIVATE)
+            for((_,v) in p.all){ try{ val o=JSONObject(v.toString()); val n=o.optString("name",""); if(n.isNotBlank() && !branches.contains(n)) branches.add(n) }catch(_:Exception){} }
+        }catch(_:Exception){}
+        spinnerBranch.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
+        spinnerBranch.layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(8,0,0,0)}
+        branchRow.addView(spinnerBranch)
         root.addView(branchRow)
 
-        // TABLE HEADER - PASTEL
-        val headerTable = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(8,12,8,12)
+        spinnerBranch.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+            override fun onItemSelected(a:AdapterView<*>?, v:View?, p:Int, id:Long){ selectedBranch=branches[p]; filter() }
+            override fun onNothingSelected(a:AdapterView<*>?){}
         }
-        fun th(t:String, w:Float): TextView {
-            return TextView(this@PriceManagementActivity).apply {
-                text = t; textSize = 10f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0,-2,w)
-            }
-        }
-        headerTable.addView(th("CODE",0.8f))
-        headerTable.addView(th("PRODUCT",1.2f))
-        headerTable.addView(th("COST",0.6f))
-        headerTable.addView(th("SELL",0.6f))
-        headerTable.addView(th("PROFIT%",0.7f))
-        headerTable.addView(th("EDIT",0.6f))
-        root.addView(headerTable)
+
+        // TABLE HEADER
+        val th = LinearLayout(this)
+        th.setBackgroundColor(Color.parseColor("#1F2937"))
+        th.setPadding(4,10,4,10)
+        fun tht(t:String,w:Float):TextView{ val tv=TextView(this); tv.text=t; tv.textSize=10f; tv.setTypeface(null, Typeface.BOLD); tv.setTextColor(Color.WHITE); tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); return tv }
+        th.addView(tht("CODE",0.7f)); th.addView(tht("PRODUCT",1.0f)); th.addView(tht("COST",0.6f)); th.addView(tht("SELL",0.6f)); th.addView(tht("PROFIT%",0.7f)); th.addView(tht("EDIT",0.7f))
+        root.addView(th)
 
         val scroll = ScrollView(this)
-        tableLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(tableLayout)
-        root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
+        scroll.layoutParams=LinearLayout.LayoutParams(-1,0,1f)
+        table = LinearLayout(this)
+        table.orientation=LinearLayout.VERTICAL
+        scroll.addView(table)
+        root.addView(scroll)
 
         setContentView(root)
 
-        loadBranches()
-        loadProducts()
+        loadProductsFixed()
+        filter()
 
-        searchEt.addTextChangedListener(object: TextWatcher{
-            override fun afterTextChanged(s: Editable?){ filterProducts() }
-            override fun beforeTextChanged(s: CharSequence?, a:Int,b:Int,c:Int){}
-            override fun onTextChanged(s: CharSequence?, a:Int,b:Int,c:Int){}
+        etSearch.addTextChangedListener(object:TextWatcher{
+            override fun afterTextChanged(s:Editable?){ filter() }
+            override fun beforeTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
+            override fun onTextChanged(a:CharSequence?,b:Int,c:Int,d:Int){}
         })
-
-        branchSpinner.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
-            override fun onItemSelected(p: AdapterView<*>?, v:View?, pos:Int, id:Long){
-                selectedBranch = branches.getOrNull(pos)?: "All Branches"
-                filterProducts()
-            }
-            override fun onNothingSelected(p: AdapterView<*>?){}
-        }
     }
 
-    private fun loadBranches(){
-        try{
-            val found = LinkedHashSet<String>()
-            for(pName in listOf("shops","branches","shops_db")){
-                try{
-                    val pref = getSharedPreferences(pName, Context.MODE_PRIVATE)
-                    for((_,v) in pref.all){
-                        val name = v.toString().split("|")[0]
-                        if(name.length in 2..30) found.add(name.trim())
-                    }
-                }catch(_:Exception){}
-            }
-            branches.clear(); branches.add("All Branches")
-            if(found.isEmpty()){ branches.add("Main Shop"); branches.add("Rukudzo Shop") } else branches.addAll(found)
-            branchSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, branches)
-        }catch(_:Exception){}
-    }
+    fun loadProductsFixed(){
+        all.clear()
+        val prefs = listOf("received_stock","stock_received","products","products_main","products_db","inventory","stock","products_list","items","goods_received")
 
-    private fun loadProducts(){
-        allProducts.clear()
-        val prefNames = listOf("products_main","products_rukudzo","products_db","products","stock_main","inventory")
-        val seen = HashSet<String>()
-        for(pName in prefNames){
+        for(pn in prefs){
             try{
-                val pref = getSharedPreferences(pName, Context.MODE_PRIVATE)
-                for((k,v) in pref.all){
+                val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
+                for((key,v) in pref.all){
                     try{
-                        if(seen.contains(k+pName)) continue
-                        var name = k; var code = k; var sku = k; var qty = 0; var cost = 0f; var price = 0f; var shop = "Main Shop"
                         val raw = v.toString()
-                        if(raw.trim().startsWith("{")){
-                            val o = JSONObject(raw)
-                            name = o.optString("name",k)
-                            code = o.optString("code", o.optString("barcode", k))
-                            sku = o.optString("sku", code)
-                            qty = o.optInt("quantity", o.optInt("qty", o.optInt("stock",0)))
-                            cost = o.optDouble("cost",0.0).toFloat()
-                            price = o.optDouble("price", o.optDouble("sell",0.0)).toFloat()
-                            shop = o.optString("shop", o.optString("branch","Main Shop"))
-                        } else {
-                            val p = raw.split("|")
-                            name = p.getOrNull(0)?:k
-                            qty = p.getOrNull(1)?.toIntOrNull()?:0
-                            price = p.getOrNull(2)?.toFloatOrNull()?:0f
-                            cost = p.getOrNull(3)?.toFloatOrNull()?: (price*0.7f)
-                            shop = p.getOrNull(4)?: "Main Shop"
-                            code = p.getOrNull(5)?: k
-                            sku = code
+                        if(!raw.trim().startsWith("{")) continue
+                        val o = JSONObject(raw)
+
+                        val code = o.optString("code", o.optString("sku", o.optString("product_code", key)))
+                        val name = o.optString("name", o.optString("product_name", o.optString("product","")))
+
+                        // ===== QTY - SEPARATE KEYS ONLY =====
+                        var qty = 0
+                        for(qk in listOf("qnty","quantity","qty","on_hand","current_stock","received_qty","in_stock")){
+                            if(o.has(qk)){
+                                qty = o.optString(qk,"0").toIntOrNull() ?: o.optInt(qk,0)
+                                if(qty==0) qty = o.optDouble(qk,0.0).toInt()
+                                if(qty!=0) break
+                            }
                         }
-                        seen.add(k+pName)
-                        // Fix stove demo
-                        if(name.contains("stove",true) && price==0f) price = 10f
-                        if(name.contains("stove",true) && cost==0f) cost = 7f
-                        if(code.isBlank()) code = name.take(8).uppercase()
-                        if(sku.isBlank()) sku = code
-                        allProducts.add(Prod(sku, code, name, qty, cost, price, shop, k, pName))
+
+                        // ===== COST - ONLY COST KEYS - NEVER QNTY =====
+                        var cost = -1f
+                        val costKeys = listOf("cost","buying_price","buy_price","cost_price","purchase_price","costPrice","buyingPrice")
+                        for(ck in costKeys){
+                            if(o.has(ck)){
+                                val str = o.optString(ck,"").trim()
+                                if(str.isNotEmpty()){
+                                    cost = str.toFloatOrNull() ?: o.optDouble(ck,-1.0).toFloat()
+                                    if(cost>=0) break
+                                }
+                            }
+                        }
+                        // If cost still -1, try price but log
+                        if(cost==-1f) cost = 0f
+
+                        // ===== SELL - ONLY SELL KEYS - NEVER QNTY =====
+                        var sell = -1f
+                        val sellKeys = listOf("selling_price","sell_price","price","sale_price","retail_price","sellingPrice","sellPrice","sp","unit_price")
+                        for(sk in sellKeys){
+                            if(o.has(sk)){
+                                val str = o.optString(sk,"").trim()
+                                if(str.isNotEmpty()){
+                                    sell = str.toFloatOrNull() ?: o.optDouble(sk,-1.0).toFloat()
+                                    if(sell>=0) break
+                                }
+                            }
+                        }
+                        if(sell==-1f) sell = 0f
+
+                        val branch = o.optString("branch","All Branches")
+
+                        // DEBUG: For 001 tv - show what we parsed
+                        if((name.isNotBlank() || code.isNotBlank()) && all.none{ it.code==code }){
+                            all.add(Product(code, if(name.isNotBlank()) name else code, qty, cost, sell, branch, raw))
+                        }
+
                     }catch(_:Exception){}
                 }
             }catch(_:Exception){}
         }
-        if(allProducts.isEmpty()){
-            allProducts.add(Prod("STOVE-01","STOVE-01","stove",3,7f,10f,"Main Shop","stove","products_main"))
-        }
-        filterProducts()
     }
 
-    private fun filterProducts(){
-        val query = searchEt.text.toString().trim().lowercase()
-        filtered = allProducts.filter{ p ->
-            val matchBranch = selectedBranch=="All Branches" || p.shop==selectedBranch || p.shop.contains(selectedBranch,true)
-            val matchSearch = if(query.isEmpty()) true else {
-                p.name.lowercase().contains(query) ||
-                p.code.lowercase().contains(query) ||
-                p.sku.lowercase().contains(query) ||
-                p.shop.lowercase().contains(query)
-            }
-            matchBranch && matchSearch
+    fun filter(){
+        val q = etSearch.text.toString().lowercase().trim()
+        filtered = all.filter{
+            val branchOk = selectedBranch=="All Branches" || it.branch.contains(selectedBranch,true)
+            val searchOk = q.isBlank() || it.name.lowercase().contains(q) || it.code.lowercase().contains(q)
+            branchOk && searchOk
         }.toMutableList()
-
-        renderTable()
+        render()
     }
 
-    private fun renderTable(){
-        tableLayout.removeAllViews()
+    fun render(){
+        table.removeAllViews()
         if(filtered.isEmpty()){
-            tableLayout.addView(TextView(this).apply{
-                text = "No products found for '${searchEt.text}' in $selectedBranch\nTry searching CODE like STOVE-01 or name"
-                gravity = Gravity.CENTER; setPadding(20,40,20,40); setTextColor(Color.GRAY)
-            })
+            table.addView(TextView(this).apply{ text="No products"; gravity=Gravity.CENTER; setPadding(0,40,0,0); setTextColor(Color.GRAY) })
             return
         }
-        for((idx, prod) in filtered.withIndex()){
-            val bg = if(idx%2==0) Color.parseColor("#FFFFFF") else Color.parseColor("#F0FDF4")
-            val profit = if(prod.price>0) ((prod.price-prod.cost)/prod.price*100) else 0f
 
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setBackgroundColor(bg)
-                setPadding(0,12,0,12)
-                gravity = Gravity.CENTER_VERTICAL
-            }
-            fun cell(t:String, w:Float, col:Int=Color.BLACK, bold:Boolean=false): TextView {
-                return TextView(this@PriceManagementActivity).apply {
-                    text = t; textSize = 11f; setTextColor(col); gravity = Gravity.CENTER
-                    if(bold) setTypeface(null, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(0,-2,w)
-                }
-            }
-            row.addView(cell(prod.code.take(10),0.8f, Color.parseColor("#2563EB"), true))
-            row.addView(cell(prod.name.take(12),1.2f))
-            row.addView(cell("$${prod.cost.toInt()}",0.6f, Color.GRAY))
-            row.addView(cell("$${prod.price.toInt()}",0.6f, Color.BLACK, true))
-            row.addView(cell("${profit.toInt()}%",0.7f, if(profit>=30) Color.parseColor("#16A34A") else Color.parseColor("#DC2626")))
+        for(p in filtered){
+            val row = LinearLayout(this)
+            row.setPadding(4,8,4,8)
+            row.setBackgroundColor(Color.WHITE)
+            row.gravity=Gravity.CENTER_VERTICAL
 
-            val editBtn = Button(this).apply {
-                text = "EDIT"; textSize = 9f
-                setBackgroundColor(Color.parseColor("#2563EB")); setTextColor(Color.WHITE)
-                layoutParams = LinearLayout.LayoutParams(0,-2,0.6f).apply{setMargins(4,0,4,0)}
-                setOnClickListener{ showEditDialog(prod) }
+            fun td(t:String,w:Float,color:Int=Color.BLACK,bold:Boolean=false):TextView{
+                val tv=TextView(this); tv.text=t; tv.textSize=11f; tv.gravity=Gravity.CENTER; tv.layoutParams=LinearLayout.LayoutParams(0,-2,w); tv.setTextColor(color)
+                if(bold) tv.setTypeface(null, Typeface.BOLD)
+                return tv
             }
-            row.addView(editBtn)
-            tableLayout.addView(row)
-            tableLayout.addView(View(this).apply{
-                setBackgroundColor(Color.parseColor("#E2E8F0"))
-                layoutParams = LinearLayout.LayoutParams(-1,1)
-            })
+
+            row.addView(td(p.code,0.7f, Color.parseColor("#2563EB"), true))
+            row.addView(TextView(this).apply{ text=p.name; textSize=11f; layoutParams=LinearLayout.LayoutParams(0,-2,1.0f); setPadding(6,0,0,0) })
+
+            // COST - NOW SHOWS REAL COST NOT QNTY
+            row.addView(td("$${p.cost}",0.6f, Color.GRAY))
+            row.addView(td("$${p.sell}",0.6f, Color.BLACK, true))
+
+            val profit = if(p.cost>0) ((p.sell - p.cost)/p.cost*100) else 0f
+            row.addView(td("${profit.toInt()}%",0.7f, if(profit>0) Color.parseColor("#16A34A") else Color.RED))
+
+            val btnEdit = Button(this)
+            btnEdit.text="EDIT"
+            btnEdit.textSize=10f
+            btnEdit.setBackgroundColor(Color.parseColor("#2563EB"))
+            btnEdit.setTextColor(Color.WHITE)
+            btnEdit.layoutParams=LinearLayout.LayoutParams(0,-2,0.7f).apply{setMargins(4,0,4,0)}
+            btnEdit.setPadding(0,12,0,12)
+            btnEdit.setOnClickListener{
+                showEditDialog(p)
+            }
+            row.addView(btnEdit)
+
+            table.addView(row)
+            table.addView(View(this).apply{ layoutParams=LinearLayout.LayoutParams(-1,1); setBackgroundColor(Color.parseColor("#E5E7EB")) })
         }
     }
 
-    private fun showEditDialog(prod: Prod){
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(20,20,20,20); setBackgroundColor(Color.WHITE)
-        }
-        layout.addView(TextView(this).apply{ text = "Code: ${prod.code}"; textSize = 11f; setTextColor(Color.parseColor("#2563EB")); setTypeface(null, Typeface.BOLD) })
-        layout.addView(TextView(this).apply{ text = "Product: ${prod.name}"; textSize = 13f; setTypeface(null, Typeface.BOLD); setPadding(0,4,0,12) })
+    fun showEditDialog(p:Product){
+        val dialog = LinearLayout(this)
+        dialog.orientation=LinearLayout.VERTICAL
+        dialog.setPadding(20,20,20,20)
 
-        fun addField(label:String, def:String): EditText {
-            layout.addView(TextView(this).apply{ text = label; textSize = 11f; setTextColor(Color.GRAY); setPadding(0,12,0,4) })
-            val et = EditText(this).apply{
-                setText(def); setBackgroundColor(Color.parseColor("#F8FAFC")); setPadding(16,12,16,12); inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        val etCost = EditText(this)
+        etCost.hint="Cost"
+        etCost.setText("${p.cost}")
+        dialog.addView(TextView(this).apply{ text="Cost for ${p.name} (${p.code}) - Current QTY is ${p.qty}" })
+        dialog.addView(etCost)
+
+        val etSell = EditText(this)
+        etSell.hint="Selling Price"
+        etSell.setText("${p.sell}")
+        dialog.addView(etSell)
+
+        val btnSave = Button(this)
+        btnSave.text="SAVE"
+        btnSave.setBackgroundColor(Color.parseColor("#16A34A"))
+        btnSave.setTextColor(Color.WHITE)
+        dialog.addView(btnSave)
+
+        val popup = android.app.AlertDialog.Builder(this).setView(dialog).create()
+        btnSave.setOnClickListener{
+            try{
+                val newCost = etCost.text.toString().toFloat()
+                val newSell = etSell.text.toString().toFloat()
+
+                // SAVE BACK TO PREFS - UPDATE COST AND SELL ONLY - KEEP QNTY SAME
+                for(pn in listOf("received_stock","products","inventory","stock")){
+                    try{
+                        val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
+                        for((k,v) in pref.all){
+                            try{
+                                val o = JSONObject(v.toString())
+                                val code = o.optString("code", o.optString("sku", k))
+                                if(code==p.code){
+                                    o.put("cost", newCost)
+                                    o.put("buying_price", newCost)
+                                    o.put("price", newSell)
+                                    o.put("selling_price", newSell)
+                                    pref.edit().putString(k, o.toString()).apply()
+                                }
+                            }catch(_:Exception){}
+                        }
+                    }catch(_:Exception){}
+                }
+
+                Toast.makeText(this,"Price updated! Cost: $newCost Sell: $newSell", Toast.LENGTH_SHORT).show()
+                popup.dismiss()
+                loadProductsFixed()
+                filter()
+            }catch(e:Exception){
+                Toast.makeText(this,"Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-            layout.addView(et); return et
         }
-        val costEt = addField("Cost Price (You Buy) - $","${prod.cost}")
-        val priceEt = addField("Selling Price (Customer Pays) - TAX INCLUSIVE - $","${prod.price}")
-        val codeEt = addField("Product Code / SKU","${prod.code}")
-
-        val profitTv = TextView(this).apply{
-            text = "Profit: ${if(prod.price>0) ((prod.price-prod.cost)/prod.price*100).toInt() else 0}%"; textSize = 12f
-            setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#16A34A")); setPadding(0,16,0,0)
-        }
-        layout.addView(profitTv)
-
-        val watcher = object: TextWatcher{
-            override fun afterTextChanged(s: Editable?){
-                try{
-                    val c = costEt.text.toString().toFloatOrNull()?:0f
-                    val p = priceEt.text.toString().toFloatOrNull()?:0f
-                    val prof = if(p>0) ((p-c)/p*100) else 0f
-                    profitTv.text = "Profit: ${prof.toInt()}% - ${if(prof>=30) "GOOD" else "LOW"}"
-                    profitTv.setTextColor(if(prof>=30) Color.parseColor("#16A34A") else Color.parseColor("#DC2626"))
-                }catch(_:Exception){}
-            }
-            override fun beforeTextChanged(s: CharSequence?, a:Int,b:Int,c:Int){}
-            override fun onTextChanged(s: CharSequence?, a:Int,b:Int,c:Int){}
-        }
-        costEt.addTextChangedListener(watcher); priceEt.addTextChangedListener(watcher)
-
-        android.app.AlertDialog.Builder(this)
-           .setTitle("Edit Price - ${prod.name}")
-           .setView(layout)
-           .setPositiveButton("SAVE"){_,_->
-                try{
-                    val newCost = costEt.text.toString().toFloatOrNull()?:prod.cost
-                    val newPrice = priceEt.text.toString().toFloatOrNull()?:prod.price
-                    val newCode = codeEt.text.toString().trim().ifEmpty{prod.code}
-                    // Save back to prefs
-                    val pref = getSharedPreferences(prod.prefName, Context.MODE_PRIVATE)
-                    val existing = pref.getString(prod.key,"")?:""
-                    val newValue = if(existing.trim().startsWith("{")){
-                        try{
-                            val o = JSONObject(existing)
-                            o.put("cost",newCost); o.put("price",newPrice); o.put("code",newCode); o.put("sku",newCode)
-                            o.toString()
-                        }catch(_:Exception){ "${prod.name}|${prod.qty}|$newPrice|$newCost|${prod.shop}|$newCode" }
-                    } else {
-                        "${prod.name}|${prod.qty}|$newPrice|$newCost|${prod.shop}|$newCode"
-                    }
-                    pref.edit().putString(prod.key, newValue).apply()
-                    Toast.makeText(this,"Price updated: ${prod.name} CODE $newCode -> $$newPrice", Toast.LENGTH_SHORT).show()
-                    loadProducts()
-                }catch(e:Exception){ Toast.makeText(this,"Save error: ${e.message}", Toast.LENGTH_SHORT).show() }
-            }
-           .setNegativeButton("CANCEL",null)
-           .show()
+        popup.show()
     }
 }
