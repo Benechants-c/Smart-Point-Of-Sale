@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuditTrailActivity : Activity() {
+class AuditLogActivity : Activity() {
 
     data class LogEntry(val dateTime:String, val type:String, val product:String, val code:String, val qty:Int, val total:Float, val branch:String, val rawTime:Long)
 
