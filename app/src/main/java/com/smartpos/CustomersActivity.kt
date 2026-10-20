@@ -3,11 +3,11 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.TextView
 
-class SalesActivity : AppCompatActivity() {
+class CustomersActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val tv = TextView(this)
-        tv.text = "Sales GREEN"
+        tv.text = "Customers GREEN"
         setContentView(tv)
     }
 }
