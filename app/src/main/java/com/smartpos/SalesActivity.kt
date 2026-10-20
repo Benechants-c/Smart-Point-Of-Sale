@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
-import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -31,8 +30,10 @@ class NewSaleActivity : Activity() {
     private lateinit var etTendered: EditText
     private lateinit var tvChange: TextView
     private lateinit var tvReceipt: TextView
+    private lateinit var tvCashierDate: TextView
 
     private val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    private var timer: Timer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,9 +54,19 @@ class NewSaleActivity : Activity() {
             setBackgroundColor(Color.parseColor("#1E3A8A"))
             setPadding(12,8,12,8)
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(TextView(this).apply { text = "SMART POS"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD); layoutParams = LinearLayout.LayoutParams(0,-2,1f) })
-        header.addView(TextView(this).apply { text = "Cashier: John Mukucha\n${sdf.format(Date())}"; setTextColor(Color.WHITE); textSize = 9f; gravity = Gravity.END })
+        header.addView(TextView(this).apply { 
+            text = "SMART POS"; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0,-2,1f)
+        })
+        // REAL CASHIER + REAL DEVICE DATE TIME
+        val realCashier = getRealCashierName()
+        tvCashierDate = TextView(this).apply { 
+            setTextColor(Color.WHITE); textSize = 9f; gravity = Gravity.END
+            text = "$realCashier\n${sdf.format(Date())}"
+        }
+        header.addView(tvCashierDate)
         root.addView(header)
 
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(-1,0,1f) }
@@ -89,7 +100,7 @@ class NewSaleActivity : Activity() {
         scroll.addView(productsContainer)
         content.addView(scroll)
 
-        // FIXED VIRTUAL RECEIPT - NO OVERLAP
+        // FIXED VIRTUAL RECEIPT - CLEAN NO OVERLAP
         val receiptCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#FDE047")); setPadding(12,12,12,12) }
         receiptCard.addView(TextView(this).apply { text = "Virtual Receipt"; setTypeface(null, Typeface.BOLD); textSize = 14f })
         tvReceipt = TextView(this).apply { text = "No items"; textSize = 10f; setPadding(0,6,0,6) }
@@ -133,14 +144,69 @@ class NewSaleActivity : Activity() {
             override fun afterTextChanged(s: Editable?){}
         })
 
+        // Auto update device time every minute
+        timer = Timer()
+        timer?.scheduleAtFixedRate(object: TimerTask(){
+            override fun run(){
+                runOnUiThread { 
+                    val rc = getRealCashierName()
+                    tvCashierDate.text = "$rc\n${sdf.format(Date())}"
+                }
+            }
+        }, 60000, 60000)
+
         loadData()
+    }
+
+    private fun getRealCashierName(): String {
+        val checkPrefs = listOf("logged_user","current_user","cashier","user","login","session","customers","cashiers","staff","users")
+        for(pn in checkPrefs){
+            try{
+                val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
+                if(pref.all.isEmpty()) continue
+                for((k,v) in pref.all){
+                    try{
+                        val s = v.toString()
+                        if(!s.startsWith("{")) {
+                            if(k.contains("name",true) || k.contains("cashier",true) || k.contains("user",true)){
+                                if(s.length in 3..30 && !s.contains("{") && !s.contains("[")) return s
+                            }
+                            continue
+                        }
+                        val o = JSONObject(s)
+                        val name = o.optString("cashier_name","").ifBlank { 
+                            o.optString("name","").ifBlank { 
+                                o.optString("full_name","").ifBlank { 
+                                    o.optString("customer_name","").ifBlank {
+                                        o.optString("staff_name","")
+                                    }
+                                }
+                            }
+                        }
+                        if(name.isNotBlank() && name.length < 40){
+                            return name
+                        }
+                    }catch(_:Exception){}
+                }
+            }catch(_:Exception){}
+        }
+        try{
+            val directKeys = listOf("current_cashier_name","cashier_name","logged_user_name","user_name","cashierName")
+            for(pn in listOf("logged_user","session","user","cashier")){
+                val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
+                for(key in directKeys){
+                    val v = pref.getString(key,"")
+                    if(!v.isNullOrBlank()) return v
+                }
+            }
+        }catch(_:Exception){}
+        return "Cashier"
     }
 
     private fun loadData(){
         allProducts.clear()
-        // FIX: Check EVERY possible pref name where Receive Stock saves
-        val prefNames = listOf("received_stock","receive_stock","receivedStock","stock_received","products","inventory","stock","products_list","all_products","shop_stock","main_shop_stock","MainShop")
-        var foundAny = 0
+        val prefNames = listOf("received_stock","receive_stock","goods_received","good_received","grn","stock_received","products","inventory","stock","products_list","all_products","shop_stock","MainShop","purchases")
+        var foundRaw = 0
         for(pn in prefNames){
             try{
                 val pref = getSharedPreferences(pn, Context.MODE_PRIVATE)
@@ -149,33 +215,30 @@ class NewSaleActivity : Activity() {
                     try{
                         val s = v.toString().trim()
                         if(!s.startsWith("{")) continue
+                        foundRaw++
                         val o = JSONObject(s)
-                        // Try ALL possible keys for name
                         var name = o.optString("product_name","")
                         if(name.isBlank()) name = o.optString("name","")
                         if(name.isBlank()) name = o.optString("productName","")
                         if(name.isBlank()) name = o.optString("item_name","")
                         if(name.isBlank()) name = o.optString("item","")
                         if(name.isBlank()) continue
-                        // Skip fake if you want, but allow real
                         if(name.contains("TR-01") || name.contains("Travel Cup")) continue
 
-                        // Try ALL possible keys for code
                         var code = o.optString("product_code","")
                         if(code.isBlank()) code = o.optString("code","")
                         if(code.isBlank()) code = o.optString("barcode","")
                         if(code.isBlank()) code = k.take(8)
 
-                        // Try ALL possible keys for qty
-                        var qty = 0
-                        if(o.has("qnty")) qty = o.optInt("qnty",0)
-                        else if(o.has("quantity")) qty = o.optInt("quantity",0)
-                        else if(o.has("qty")) qty = o.optInt("qty",0)
-                        else if(o.has("stock_qty")) qty = o.optInt("stock_qty",0)
-                        else if(o.has("current_qty")) qty = o.optInt("current_qty",0)
-                        else if(o.has("received_qty")) qty = o.optInt("received_qty",0)
+                        var qty = 1
+                        if(o.has("qnty")) qty = o.optInt("qnty",1)
+                        else if(o.has("quantity")) qty = o.optInt("quantity",1)
+                        else if(o.has("qty")) qty = o.optInt("qty",1)
+                        else if(o.has("stock_qty")) qty = o.optInt("stock_qty",1)
+                        else if(o.has("current_qty")) qty = o.optInt("current_qty",1)
+                        else if(o.has("received_qty")) qty = o.optInt("received_qty",1)
+                        else if(o.has("available_qty")) qty = o.optInt("available_qty",1)
 
-                        // Try ALL possible keys for price - THIS WAS THE BUG
                         var price = 0f
                         if(o.has("selling_price")) price = o.optDouble("selling_price",0.0).toFloat()
                         else if(o.has("sellingPrice")) price = o.optDouble("sellingPrice",0.0).toFloat()
@@ -183,14 +246,12 @@ class NewSaleActivity : Activity() {
                         else if(o.has("sell_price")) price = o.optDouble("sell_price",0.0).toFloat()
                         else if(o.has("retail_price")) price = o.optDouble("retail_price",0.0).toFloat()
                         else if(o.has("sp")) price = o.optDouble("sp",0.0).toFloat()
-                        else if(o.has("buying_price")) price = (o.optDouble("buying_price",0.0)*1.2).toFloat() // use buying + 20%
+                        else if(o.has("unit_price")) price = o.optDouble("unit_price",0.0).toFloat()
+                        else if(o.has("buying_price")) price = (o.optDouble("buying_price",0.0)*1.25).toFloat()
 
-                        if(qty<=0 && price<=0) continue // skip empty
-                        if(price<=0) price = 1f // allow item even if price missing, to show
+                        if(price<=0f) continue
 
-                        foundAny++
-                        // Avoid duplicates
-                        if(allProducts.none { it.name==name }){
+                        if(allProducts.none { it.name==name && it.code==code }){
                             allProducts.add(Product(k, name, code, price, qty))
                         }
                     }catch(_:Exception){}
@@ -198,22 +259,26 @@ class NewSaleActivity : Activity() {
             }catch(_:Exception){}
         }
 
-        filteredProducts = allProducts.toMutableList()
-
-        // Shops
         val shops = mutableListOf("Main Shop")
         try{
             val pref = getSharedPreferences("shops", Context.MODE_PRIVATE)
-            for((_,v) in pref.all){ try{ val o=JSONObject(v.toString()); val n=o.optString("name",""); if(n.isNotBlank()) shops.add(n) }catch(_:Exception){} }
+            for((_,v) in pref.all){ 
+                try{ 
+                    val o=JSONObject(v.toString()); 
+                    val n=o.optString("name",""); 
+                    if(n.isNotBlank()) shops.add(n) 
+                }catch(_:Exception){} 
+            }
         }catch(_:Exception){}
         shopSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, shops.distinct())
 
+        filteredProducts = allProducts.toMutableList()
+        
         if(allProducts.isEmpty()){
-            Toast.makeText(this, "No stock found in received_stock. Found $foundAny raw. Go Receive Stock first.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "No stock in Goods Received (checked $foundRaw items). Go to Goods Received screen and SAVE.", Toast.LENGTH_LONG).show()
         }else{
-            Toast.makeText(this, "Loaded ${allProducts.size} products from Received Stock", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Loaded ${allProducts.size} real products from Goods Received", Toast.LENGTH_SHORT).show()
         }
-
         renderProducts()
     }
 
@@ -228,7 +293,7 @@ class NewSaleActivity : Activity() {
 
         if(filteredProducts.isEmpty()){
             productsContainer.addView(TextView(this).apply {
-                text = "No products yet\n\nYour Received Stock is empty or field names mismatch\n\nGo to RECEIVE STOCK\nAdd stock there\nThen come back here"
+                text = "No products yet\n\nYour Goods Received is empty\n\nGo to RECEIVE STOCK / GOODS RECEIVED\nAdd stock there\nThen come back here"
                 gravity = Gravity.CENTER
                 setTextColor(Color.GRAY)
                 setPadding(0,30,0,30)
@@ -299,5 +364,10 @@ class NewSaleActivity : Activity() {
         edit.apply()
         Toast.makeText(this,"Sale saved: $${total}",Toast.LENGTH_LONG).show()
         cart.clear(); updateReceipt(); etTendered.setText("")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        timer?.cancel()
     }
 }
