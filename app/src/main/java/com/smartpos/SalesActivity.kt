@@ -1,11 +1,13 @@
 package com.smartpos
-import android.app.Activity
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
 import android.widget.TextView
-import android.graphics.Color
-class SalesActivity : Activity() {
+
+class SalesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val tv = TextView(this); tv.text = "Sales - GREEN BUILD"; tv.setPadding(30,30,30,30); tv.setBackgroundColor(Color.WHITE); setContentView(tv)
+        val tv = TextView(this)
+        tv.text = "Sales GREEN"
+        setContentView(tv)
     }
 }
