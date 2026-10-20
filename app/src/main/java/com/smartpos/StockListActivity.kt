@@ -10,7 +10,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.roundToInt
 
 data class StockItem(
     val code: String,
@@ -40,7 +39,6 @@ class StockListActivity : AppCompatActivity() {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
 
-        // HEADER
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1976D2"))
@@ -61,7 +59,6 @@ class StockListActivity : AppCompatActivity() {
         header.addView(title)
         header.addView(tvTime)
 
-        // SEARCH AT VERY TOP - product code or name
         val searchBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
@@ -80,7 +77,6 @@ class StockListActivity : AppCompatActivity() {
         searchBox.addView(etSearch)
         searchBox.addView(tvCount)
 
-        // SUMMARY - Stock Value at Selling / at Cost
         val summaryBox = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#FFF3E0"))
@@ -102,7 +98,6 @@ class StockListActivity : AppCompatActivity() {
         summaryBox.addView(tvValueCost)
         summaryBox.addView(tvValueSelling)
 
-        // LIST HEADER
         val listHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#37474F"))
@@ -125,7 +120,6 @@ class StockListActivity : AppCompatActivity() {
         addH("COST", 0.8f)
         addH("SELL", 0.8f)
 
-        // SCROLL PRODUCTS
         val scroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         }
@@ -143,7 +137,6 @@ class StockListActivity : AppCompatActivity() {
 
         setContentView(root)
 
-        // Load from Goods Received
         loadFromGoodsReceived()
         setupSearch()
         renderStock(allStock)
@@ -155,16 +148,15 @@ class StockListActivity : AppCompatActivity() {
         val productsPrefs = getSharedPreferences("products", MODE_PRIVATE)
         val stockPrefs = getSharedPreferences("stock_data", MODE_PRIVATE)
 
-        // Try load real data from 3 possible prefs
-        val combined = mutableMapOf<String, Any>()
-        combined.putAll(goodsPrefs.all)
-        combined.putAll(productsPrefs.all)
-        combined.putAll(stockPrefs.all)
+        // FIXED - safe map copy to avoid Type mismatch
+        val combined = mutableMapOf<String, Any?>()
+        for ((k, v) in goodsPrefs.all) combined[k] = v
+        for ((k, v) in productsPrefs.all) combined[k] = v
+        for ((k, v) in stockPrefs.all) combined[k] = v
 
         if (combined.isNotEmpty()) {
             for ((key, value) in combined) {
                 try {
-                    // Try parse format: code|name|qty|cost|selling  OR  name:price
                     val str = value.toString()
                     if (str.contains("|")) {
                         val parts = str.split("|")
@@ -182,7 +174,6 @@ class StockListActivity : AppCompatActivity() {
             }
         }
 
-        // If still empty -> demo but looks like real goods received
         if (allStock.isEmpty()) {
             allStock.add(StockItem("P001", "Coca Cola 500ml", 45, 0.80, 1.50))
             allStock.add(StockItem("P002", "Bread Loaf Brown", 20, 0.70, 1.20))
@@ -213,14 +204,11 @@ class StockListActivity : AppCompatActivity() {
 
     private fun renderStock(list: List<StockItem>) {
         productContainer.removeAllViews()
-
         var totalCostValue = 0.0
         var totalSellValue = 0.0
-
         for (item in list) {
             totalCostValue += item.qty * item.cost
             totalSellValue += item.qty * item.selling
-
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundColor(Color.WHITE)
@@ -229,7 +217,6 @@ class StockListActivity : AppCompatActivity() {
                 lp.setMargins(0,0,0,6)
                 layoutParams = lp
             }
-
             fun addCell(text: String, weight: Float, bold: Boolean = false, color: Int = Color.BLACK) {
                 val tv = TextView(this@StockListActivity).apply {
                     this.text = text
@@ -240,20 +227,16 @@ class StockListActivity : AppCompatActivity() {
                 }
                 row.addView(tv)
             }
-
             addCell(item.code, 1.2f, true, Color.parseColor("#1976D2"))
             addCell(item.name, 2f)
             addCell("${item.qty}", 0.7f, true)
-            addCell("${item.qty}", 0.9f, true, Color.parseColor("#2E7D32")) // Stock in hand same as qty
+            addCell("${item.qty}", 0.9f, true, Color.parseColor("#2E7D32"))
             addCell("$${item.cost}", 0.8f)
             addCell("$${item.selling}", 0.8f, true)
-
             productContainer.addView(row)
         }
-
-        // Update summary values
         tvValueCost.text = "Value at COST: $${String.format("%.2f", totalCostValue)}"
         tvValueSelling.text = "Value at SELLING: $${String.format("%.2f", totalSellValue)}"
-        tvCount.text = "${list.size} products found | Real Time: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())}"
+        tvCount.text = "${list.size} products | Real Time: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())}"
     }
 }
