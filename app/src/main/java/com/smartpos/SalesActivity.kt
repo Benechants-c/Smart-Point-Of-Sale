@@ -1,15 +1,10 @@
 package com.smartpos
-
-import android.content.SharedPreferences
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.Gravity
+import android.graphics.Color
+import android.graphics.Typeface
 import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import android.graphics.Color
-import android.graphics.Typeface
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -20,112 +15,98 @@ class SalesActivity : AppCompatActivity() {
     private lateinit var tvTotal: TextView
     private lateinit var productContainer: LinearLayout
     private lateinit var cartContainer: LinearLayout
-    
-    private val handler = Handler(Looper.getMainLooper())
     private var cartTotal = 0.0
     private val cartItems = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try{
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.parseColor("#F5F5F5"))
 
-        // Root layout
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        }
+        val header = LinearLayout(this)
+        header.orientation = LinearLayout.VERTICAL
+        header.setBackgroundColor(Color.parseColor("#1976D2"))
+        header.setPadding(30,30,30,30)
 
-        // HEADER - Nice POS header with cashier + real device time
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#1976D2"))
-            setPadding(30,30,30,30)
-        }
+        val title = TextView(this)
+        title.text = "SMART POS - SALES"
+        title.setTextColor(Color.WHITE)
+        title.textSize = 20f
+        title.setTypeface(null, Typeface.BOLD)
 
-        val title = TextView(this).apply {
-            text = "SMART POS - SALES"
-            setTextColor(Color.WHITE)
-            textSize = 20f
-            typeface = Typeface.DEFAULT_BOLD
-        }
-
-        tvCashier = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            textSize = 14f
+        tvCashier = TextView(this)
+        tvCashier.setTextColor(Color.WHITE)
+        tvCashier.textSize = 14f
+        try{
             val prefs = getSharedPreferences("pos_prefs", MODE_PRIVATE)
-            val cashierName = prefs.getString("cashier_name", null) 
-                ?: prefs.getString("logged_user", null)
-                ?: prefs.getString("user_name", "Cashier")
-            text = "Cashier: $cashierName | Device: ${android.os.Build.MODEL}"
-        }
+            val cashierName = prefs.getString("cashier_name", null) ?: prefs.getString("logged_user", "Cashier") ?: "Cashier"
+            tvCashier.text = "Cashier: $cashierName"
+        }catch(_:Exception){ tvCashier.text = "Cashier: Cashier" }
 
-        tvDateTime = TextView(this).apply {
-            setTextColor(Color.parseColor("#E3F2FD"))
-            textSize = 13f
-        }
+        tvDateTime = TextView(this)
+        tvDateTime.setTextColor(Color.parseColor("#E3F2FD"))
+        tvDateTime.textSize = 13f
+        tvDateTime.text = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
         header.addView(title)
         header.addView(tvCashier)
         header.addView(tvDateTime)
 
-        // PRODUCT SECTION - Fetch from Goods Received
-        val productLabel = TextView(this).apply {
-            text = "Products (From Goods Received)"
-            setPadding(20,20,20,10)
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.BLACK)
-        }
+        val productLabel = TextView(this)
+        productLabel.text = "Products (From Goods Received)"
+        productLabel.setPadding(20,20,20,10)
+        productLabel.textSize = 16f
+        productLabel.setTypeface(null, Typeface.BOLD)
 
-        val scrollProducts = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        }
+        val scrollProducts = ScrollView(this)
+        val lpScroll = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        lpScroll.weight = 1f
+        scrollProducts.layoutParams = lpScroll
 
-        productContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(15,15,15,15)
-        }
+        productContainer = LinearLayout(this)
+        productContainer.orientation = LinearLayout.VERTICAL
+        productContainer.setPadding(15,15,15,15)
         scrollProducts.addView(productContainer)
 
-        // CART SECTION
-        val cartLabel = TextView(this).apply {
-            text = "Cart"
-            setPadding(20,15,20,10)
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-            setBackgroundColor(Color.WHITE)
-        }
+        val cartLabel = TextView(this)
+        cartLabel.text = "Cart"
+        cartLabel.setPadding(20,15,20,10)
+        cartLabel.textSize = 16f
+        cartLabel.setTypeface(null, Typeface.BOLD)
+        cartLabel.setBackgroundColor(Color.WHITE)
 
-        cartContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(20,20,20,20)
-        }
+        cartContainer = LinearLayout(this)
+        cartContainer.orientation = LinearLayout.VERTICAL
+        cartContainer.setBackgroundColor(Color.WHITE)
+        cartContainer.setPadding(20,20,20,20)
 
-        tvTotal = TextView(this).apply {
-            text = "Total: $0.00"
-            textSize = 18f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#1976D2"))
-            setPadding(20,10,20,20)
-            setBackgroundColor(Color.WHITE)
-        }
+        tvTotal = TextView(this)
+        tvTotal.text = "Total: $0.00"
+        tvTotal.textSize = 18f
+        tvTotal.setTypeface(null, Typeface.BOLD)
+        tvTotal.setTextColor(Color.parseColor("#1976D2"))
+        tvTotal.setPadding(20,10,20,20)
+        tvTotal.setBackgroundColor(Color.WHITE)
 
-        val btnCheckout = Button(this).apply {
-            text = "CHECKOUT"
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setTextColor(Color.WHITE)
-        }
+        val btnCheckout = Button(this)
+        btnCheckout.text = "CHECKOUT"
+        btnCheckout.setBackgroundColor(Color.parseColor("#4CAF50"))
+        btnCheckout.setTextColor(Color.WHITE)
 
         btnCheckout.setOnClickListener {
-            if (cartItems.isEmpty()) {
-                Toast.makeText(this@SalesActivity, "Cart empty", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this@SalesActivity, "Sale: $cartTotal - ${getRealTime()}", Toast.LENGTH_LONG).show()
+            try{
+            if(cartItems.isEmpty()){
+                Toast.makeText(this, "Cart empty", Toast.LENGTH_SHORT).show()
+            }else{
+                val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                Toast.makeText(this, "Sale: $cartTotal - $time", Toast.LENGTH_LONG).show()
                 cartItems.clear()
                 cartTotal = 0.0
                 refreshCart()
             }
+            }catch(_:Exception){}
         }
 
         root.addView(header)
@@ -137,105 +118,86 @@ class SalesActivity : AppCompatActivity() {
         root.addView(btnCheckout)
 
         setContentView(root)
-
-        // Start real device time
-        startRealTimeClock()
-        // Load products from Goods Received (SharedPreferences)
         loadGoodsReceivedProducts()
-    }
 
-    private fun startRealTimeClock() {
-        val runnable = object : Runnable {
-            override fun run() {
-                tvDateTime.text = getRealTime()
-                handler.postDelayed(this, 1000)
-            }
+        }catch(e:Exception){
+            Toast.makeText(this,"Sales init error: ${e.message}",Toast.LENGTH_LONG).show()
+            finish()
         }
-        handler.post(runnable)
     }
 
-    private fun getRealTime(): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss EEE", Locale.getDefault())
-        return sdf.format(Date()) // Real device time
-    }
-
-    private fun loadGoodsReceivedProducts() {
+    private fun loadGoodsReceivedProducts(){
+        try{
         productContainer.removeAllViews()
-        val prefs = getSharedPreferences("pos_prefs", MODE_PRIVATE)
         val goodsPrefs = getSharedPreferences("goods_received", MODE_PRIVATE)
-
-        // Try to get real goods from prefs - if not, show demo with real logic
         val productList = mutableListOf<Pair<String, Double>>()
 
-        // Check if app stored goods as set
-        val allEntries = goodsPrefs.all
-        if (allEntries.isNotEmpty()) {
-            for ((key, value) in allEntries) {
-                try {
-                    val price = (value.toString().toDoubleOrNull() ?: 1.0)
-                    productList.add(Pair(key, price))
-                } catch (e: Exception) {}
-            }
+        for((_, value) in goodsPrefs.all){
+            try{
+                val s = value.toString()
+                if(s.contains("|")){
+                    val parts = s.split("|")
+                    val name = parts.getOrNull(1) ?: s
+                    val price = parts.getOrNull(4)?.toDoubleOrNull() ?: parts.getOrNull(3)?.toDoubleOrNull() ?: 1.0
+                    productList.add(Pair(name, price))
+                }else{
+                    val price = s.toDoubleOrNull() ?: 1.0
+                    productList.add(Pair(value.toString(), price))
+                }
+            }catch(_:Exception){}
         }
 
-        // If empty, demo products (still uses real fetching logic structure)
-        if (productList.isEmpty()) {
-            productList.add(Pair("Coca Cola 500ml - From GR", 1.50))
-            productList.add(Pair("Bread Loaf - From GR", 1.20))
-            productList.add(Pair("Milk 1L - From GR", 1.00))
-            productList.add(Pair("Rice 2kg - From GR", 3.50))
-            productList.add(Pair("Cooking Oil - From GR", 4.00))
+        if(productList.isEmpty()){
+            productList.add(Pair("Coca Cola 500ml", 1.50))
+            productList.add(Pair("Bread Loaf", 1.20))
+            productList.add(Pair("Milk 1L", 1.00))
         }
 
-        for ((name, price) in productList) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(15,15,15,15)
-                setBackgroundColor(Color.WHITE)
-                val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                params.setMargins(0,0,0,15)
-                layoutParams = params
-            }
+        for((name, price) in productList){
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.setPadding(15,15,15,15)
+            row.setBackgroundColor(Color.WHITE)
+            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            params.setMargins(0,0,0,15)
+            row.layoutParams = params
 
-            val tvName = TextView(this).apply {
-                text = "$name\n$${price}"
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                setTextColor(Color.BLACK)
-            }
+            val tvName = TextView(this)
+            tvName.text = "$name - $${String.format("%.2f", price)}"
+            tvName.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            tvName.setTextColor(Color.BLACK)
 
-            val btnAdd = Button(this).apply {
-                text = "ADD"
-                setBackgroundColor(Color.parseColor("#1976D2"))
-                setTextColor(Color.WHITE)
-            }
+            val btnAdd = Button(this)
+            btnAdd.text = "ADD"
+            btnAdd.setBackgroundColor(Color.parseColor("#1976D2"))
+            btnAdd.setTextColor(Color.WHITE)
 
             btnAdd.setOnClickListener {
+                try{
                 cartItems.add(name)
                 cartTotal += price
                 refreshCart()
                 Toast.makeText(this, "$name added", Toast.LENGTH_SHORT).show()
+                }catch(_:Exception){}
             }
 
             row.addView(tvName)
             row.addView(btnAdd)
             productContainer.addView(row)
         }
+        }catch(_:Exception){ Toast.makeText(this,"Load error",Toast.LENGTH_SHORT).show() }
     }
 
-    private fun refreshCart() {
+    private fun refreshCart(){
+        try{
         cartContainer.removeAllViews()
-        for (item in cartItems) {
-            val tv = TextView(this).apply {
-                text = "• $item"
-                setPadding(5,5,5,5)
-            }
+        for(item in cartItems){
+            val tv = TextView(this)
+            tv.text = "• $item"
+            tv.setPadding(5,5,5,5)
             cartContainer.addView(tv)
         }
-        tvTotal.text = "Total: $${String.format("%.2f", cartTotal)} | ${getRealTime()}"
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
+        tvTotal.text = "Total: $${String.format("%.2f", cartTotal)}"
+        }catch(_:Exception){}
     }
 }
