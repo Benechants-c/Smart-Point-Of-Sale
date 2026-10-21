@@ -11,11 +11,8 @@ import android.graphics.Typeface
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class TakeEntry(
-    val stockItem: StockItem,
-    var counted: Int? = null,
-    var variance: Int? = null
-)
+data class StockItem(val code: String, val name: String, val qty: Int, val cost: Double, val selling: Double)
+data class TakeEntry(val stockItem: StockItem, var counted: Int? = null, var variance: Int? = null)
 
 class StockTakeActivity : AppCompatActivity() {
 
@@ -33,117 +30,107 @@ class StockTakeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try{
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.parseColor("#F5F5F5"))
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        }
-
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#263238"))
-            setPadding(30,25,30,25)
-        }
-        val title = TextView(this).apply {
-            text = "STOCK TAKE - LIVE VARIANCE"
-            setTextColor(Color.WHITE)
-            textSize = 18f
-            typeface = Typeface.DEFAULT_BOLD
-        }
+        val header = LinearLayout(this)
+        header.orientation = LinearLayout.VERTICAL
+        header.setBackgroundColor(Color.parseColor("#263238"))
+        header.setPadding(30,25,30,25)
+        val title = TextView(this)
+        title.text = "STOCK TAKE - LIVE VARIANCE"
+        title.setTextColor(Color.WHITE)
+        title.textSize = 18f
+        title.setTypeface(null, Typeface.BOLD)
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val prefs = getSharedPreferences("pos_prefs", MODE_PRIVATE)
-        val cashier = prefs.getString("cashier_name", prefs.getString("logged_user", "Cashier"))
-        val tvHead = TextView(this).apply {
-            text = "Cashier: $cashier | Real: ${sdf.format(Date())}"
-            setTextColor(Color.parseColor("#CFD8DC"))
-            textSize = 11f
-        }
+        val cashier = prefs.getString("cashier_name", prefs.getString("logged_user", "Cashier") ?: "Cashier") ?: "Cashier"
+        val tvHead = TextView(this)
+        tvHead.text = "Cashier: $cashier | Real: ${sdf.format(Date())}"
+        tvHead.setTextColor(Color.parseColor("#CFD8DC"))
+        tvHead.textSize = 11f
         header.addView(title)
         header.addView(tvHead)
 
-        // START NEW STOCK TAKE - NAME REQUIRED
-        val nameBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(20,20,20,20)
-        }
-        val nameLabel = TextView(this).apply {
-            text = "Enter Stock Take Name to Start (e.g. January Stock Take, Spot Check, End of Month):"
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#263238"))
-            setPadding(0,0,0,10)
-        }
-        etTakeName = EditText(this).apply {
-            hint = ""
-            setBackgroundResource(android.R.drawable.editbox_background)
-            setPadding(25,25,25,25)
-        }
-        btnStart = Button(this).apply {
-            text = "START STOCK TAKE"
-            setBackgroundColor(Color.parseColor("#263238"))
-            setTextColor(Color.WHITE)
-        }
+        val nameBox = LinearLayout(this)
+        nameBox.orientation = LinearLayout.VERTICAL
+        nameBox.setBackgroundColor(Color.WHITE)
+        nameBox.setPadding(20,20,20,20)
+        val nameLabel = TextView(this)
+        nameLabel.text = "Enter Stock Take Name to Start (e.g. January Stock Take, Spot Check):"
+        nameLabel.textSize = 13f
+        nameLabel.setTypeface(null, Typeface.BOLD)
+        nameLabel.setTextColor(Color.parseColor("#263238"))
+        nameLabel.setPadding(0,0,0,10)
+        etTakeName = EditText(this)
+        etTakeName.hint = "Stock Take Name"
+        etTakeName.setPadding(25,25,25,25)
+        etTakeName.setBackgroundColor(Color.WHITE)
+        btnStart = Button(this)
+        btnStart.text = "START STOCK TAKE"
+        btnStart.setBackgroundColor(Color.parseColor("#263238"))
+        btnStart.setTextColor(Color.WHITE)
         nameBox.addView(nameLabel)
         nameBox.addView(etTakeName)
         nameBox.addView(btnStart)
 
-        // Search
-        val searchBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#E0F2F1"))
-            setPadding(15,15,15,15)
-        }
-        etSearch = EditText(this).apply {
-            hint = ""
-            setBackgroundResource(android.R.drawable.editbox_background)
-            setPadding(25,25,25,25)
-        }
-        tvCount = TextView(this).apply { textSize = 12f; setTextColor(Color.GRAY); setPadding(5,10,5,0) }
+        val searchBox = LinearLayout(this)
+        searchBox.orientation = LinearLayout.VERTICAL
+        searchBox.setBackgroundColor(Color.parseColor("#E0F2F1"))
+        searchBox.setPadding(15,15,15,15)
+        etSearch = EditText(this)
+        etSearch.hint = "Search Code or Product..."
+        etSearch.setPadding(25,25,25,25)
+        etSearch.setBackgroundColor(Color.WHITE)
+        tvCount = TextView(this)
+        tvCount.textSize = 12f
+        tvCount.setTextColor(Color.GRAY)
+        tvCount.setPadding(5,10,5,0)
         searchBox.addView(etSearch)
         searchBox.addView(tvCount)
 
-        val summaryBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#ECEFF1"))
-            setPadding(15,15,15,15)
-        }
-        tvSummary = TextView(this).apply { textSize = 13f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.BLACK) }
-        val legend = TextView(this).apply {
-            text = "Variance LIVE: ✅ 0 = GREEN | 🔵 Positive = BLUE | 🔴 Negative = RED"
-            textSize = 11f
-            setTextColor(Color.DKGRAY)
-            setPadding(0,8,0,0)
-        }
+        val summaryBox = LinearLayout(this)
+        summaryBox.orientation = LinearLayout.VERTICAL
+        summaryBox.setBackgroundColor(Color.parseColor("#ECEFF1"))
+        summaryBox.setPadding(15,15,15,15)
+        tvSummary = TextView(this)
+        tvSummary.textSize = 13f
+        tvSummary.setTypeface(null, Typeface.BOLD)
+        val legend = TextView(this)
+        legend.text = "Variance LIVE: 0 = GREEN | Positive = BLUE | Negative = RED"
+        legend.textSize = 11f
+        legend.setTextColor(Color.DKGRAY)
+        legend.setPadding(0,8,0,0)
         summaryBox.addView(tvSummary)
         summaryBox.addView(legend)
 
-        val listHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#37474F"))
-            setPadding(10,12,10,12)
-        }
+        val listHeader = LinearLayout(this)
+        listHeader.orientation = LinearLayout.HORIZONTAL
+        listHeader.setBackgroundColor(Color.parseColor("#37474F"))
+        listHeader.setPadding(10,12,10,12)
         fun addH(t: String, w: Float) {
-            val tv = TextView(this@StockTakeActivity).apply {
-                text = t; setTextColor(Color.WHITE); textSize = 11f; typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, w)
-            }
+            val tv = TextView(this@StockTakeActivity)
+            tv.text = t; tv.setTextColor(Color.WHITE); tv.textSize = 11f; tv.setTypeface(null,Typeface.BOLD)
+            tv.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, w)
             listHeader.addView(tv)
         }
         addH("PRODUCT", 1.8f); addH("CODE", 1f); addH("ON HAND", 0.9f); addH("COUNTED", 1f); addH("VARIANCE", 1f)
 
-        val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        }
-        container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(5,5,5,5) }
+        val scroll = ScrollView(this)
+        val lpScroll = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        lpScroll.weight = 1f
+        scroll.layoutParams = lpScroll
+        container = LinearLayout(this)
+        container.orientation = LinearLayout.VERTICAL
+        container.setPadding(5,5,5,5)
         scroll.addView(container)
 
-        val btnSave = Button(this).apply {
-            text = "💾 SAVE & OVERRIDE STOCK"
-            setBackgroundColor(Color.parseColor("#00796B"))
-            setTextColor(Color.WHITE)
-        }
+        val btnSave = Button(this)
+        btnSave.text = "SAVE & OVERRIDE STOCK"
+        btnSave.setBackgroundColor(Color.parseColor("#00796B"))
+        btnSave.setTextColor(Color.WHITE)
 
         root.addView(header)
         root.addView(nameBox)
@@ -156,6 +143,7 @@ class StockTakeActivity : AppCompatActivity() {
         setContentView(root)
 
         btnStart.setOnClickListener {
+            try{
             val name = etTakeName.text.toString().trim()
             if (name.isEmpty()) {
                 etTakeName.error = "Enter stock take name e.g. January Stock Take"
@@ -165,7 +153,8 @@ class StockTakeActivity : AppCompatActivity() {
             takeStarted = true
             loadFromStockList()
             render(allEntries)
-            Toast.makeText(this, "Started: $name - Enter counted qty - Live variance", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Started: $name - Enter counted qty", Toast.LENGTH_LONG).show()
+            }catch(e:Exception){ Toast.makeText(this,"Start error: ${e.message}",Toast.LENGTH_LONG).show() }
         }
 
         btnSave.setOnClickListener { saveAndOverride() }
@@ -173,17 +162,21 @@ class StockTakeActivity : AppCompatActivity() {
         etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                try{
                 val q = s.toString().trim().lowercase()
                 filteredEntries = if (q.isEmpty()) allEntries.toMutableList() else allEntries.filter {
                     it.stockItem.code.lowercase().contains(q) || it.stockItem.name.lowercase().contains(q)
                 }.toMutableList()
                 render(filteredEntries)
+                }catch(_:Exception){}
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+        }catch(e:Exception){ Toast.makeText(this,"Init error: ${e.message}",Toast.LENGTH_LONG).show(); finish() }
     }
 
     private fun loadFromStockList() {
+        try{
         allEntries.clear()
         val goodsPrefs = getSharedPreferences("goods_received", MODE_PRIVATE)
         val productsPrefs = getSharedPreferences("products", MODE_PRIVATE)
@@ -196,108 +189,94 @@ class StockTakeActivity : AppCompatActivity() {
 
         val tempStock = mutableListOf<StockItem>()
 
-        if (combined.isNotEmpty()) {
-            for ((key, value) in combined) {
-                try {
-                    val str = value.toString()
-                    if (str.contains("|")) {
-                        val parts = str.split("|")
-                        val code = parts.getOrNull(0) ?: key
-                        val name = parts.getOrNull(1) ?: key
-                        val qty = parts.getOrNull(2)?.toIntOrNull() ?: 0
-                        val cost = parts.getOrNull(3)?.toDoubleOrNull() ?: 1.0
-                        val sell = parts.getOrNull(4)?.toDoubleOrNull() ?: cost * 1.3
-                        tempStock.add(StockItem(code, name, qty, cost, sell))
-                    } else {
-                        val cost = str.toDoubleOrNull()
-                        if (cost != null) {
-                            tempStock.add(StockItem(key.take(8).uppercase(), key, 0, cost, cost * 1.5))
-                        }
-                    }
-                } catch (e: Exception) {}
-            }
+        for ((key, value) in combined) {
+            try {
+                val str = value.toString()
+                if (str.contains("|")) {
+                    val parts = str.split("|")
+                    val code = parts.getOrNull(0) ?: key
+                    val name = parts.getOrNull(1) ?: key
+                    val qty = parts.getOrNull(2)?.toIntOrNull() ?: 0
+                    val cost = parts.getOrNull(3)?.toDoubleOrNull() ?: 1.0
+                    val sell = parts.getOrNull(4)?.toDoubleOrNull() ?: cost * 1.3
+                    tempStock.add(StockItem(code, name, qty, cost, sell))
+                }
+            } catch (_: Exception) {}
         }
-
-        // No demo hints - leave empty if no stock, user said don't put hints
-        // But if we have real stock from prefs we show it
         for (item in tempStock) {
             allEntries.add(TakeEntry(item, null, null))
         }
         filteredEntries = allEntries.toMutableList()
+        }catch(_:Exception){ allEntries.clear() }
     }
 
     private fun render(list: List<TakeEntry>) {
+        try{
         container.removeAllViews()
         if (!takeStarted) {
-            val tv = TextView(this).apply {
-                text = "Enter Stock Take Name above and press START"
-                setPadding(30,50,30,50)
-                textSize = 14f
-                setTextColor(Color.GRAY)
-                gravity = android.view.Gravity.CENTER
-            }
+            val tv = TextView(this)
+            tv.text = "Enter Stock Take Name above and press START"
+            tv.setPadding(30,50,30,50)
+            tv.textSize = 14f
+            tv.setTextColor(Color.GRAY)
             container.addView(tv)
             return
         }
 
         for (entry in list) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setBackgroundColor(Color.WHITE)
-                setPadding(10,10,10,10)
-                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                lp.setMargins(0,0,0,6)
-                layoutParams = lp
-            }
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.setBackgroundColor(Color.WHITE)
+            row.setPadding(10,10,10,10)
+            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(0,0,0,6)
+            row.layoutParams = lp
 
-            val tvProduct = TextView(this).apply {
-                text = entry.stockItem.name
-                textSize = 12f
-                setTextColor(Color.BLACK)
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
-            }
-            val tvCode = TextView(this).apply {
-                text = entry.stockItem.code
-                textSize = 11f
-                setTextColor(Color.parseColor("#1976D2"))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            val tvOnHand = TextView(this).apply {
-                text = "${entry.stockItem.qty}"
-                textSize = 12f
-                setTextColor(Color.BLACK)
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.9f)
-                gravity = android.view.Gravity.CENTER
-            }
-            val etCounted = EditText(this).apply {
-                hint = ""
-                textSize = 12f
-                setBackgroundResource(android.R.drawable.editbox_background)
-                setPadding(10,10,10,10)
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(5,0,5,0) }
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER
-                if (entry.counted != null) setText("${entry.counted}")
-            }
-            val tvVariance = TextView(this).apply {
-                textSize = 13f
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                gravity = android.view.Gravity.CENTER
-                setPadding(5,8,5,8)
-                text = ""
-                setBackgroundColor(Color.parseColor("#EEEEEE"))
-            }
+            val tvProduct = TextView(this)
+            tvProduct.text = entry.stockItem.name
+            tvProduct.textSize = 12f
+            tvProduct.setTextColor(Color.BLACK)
+            tvProduct.setTypeface(null, Typeface.BOLD)
+            tvProduct.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.8f)
+
+            val tvCode = TextView(this)
+            tvCode.text = entry.stockItem.code
+            tvCode.textSize = 11f
+            tvCode.setTextColor(Color.parseColor("#1976D2"))
+            tvCode.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+
+            val tvOnHand = TextView(this)
+            tvOnHand.text = "${entry.stockItem.qty}"
+            tvOnHand.textSize = 12f
+            tvOnHand.setTextColor(Color.BLACK)
+            tvOnHand.setTypeface(null, Typeface.BOLD)
+            tvOnHand.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.9f)
+
+            val etCounted = EditText(this)
+            etCounted.hint = "0"
+            etCounted.textSize = 12f
+            etCounted.setBackgroundColor(Color.WHITE)
+            etCounted.setPadding(10,10,10,10)
+            etCounted.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            etCounted.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            if (entry.counted != null) etCounted.setText("${entry.counted}")
+
+            val tvVariance = TextView(this)
+            tvVariance.textSize = 13f
+            tvVariance.setTypeface(null, Typeface.BOLD)
+            tvVariance.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            tvVariance.setPadding(5,8,5,8)
+            tvVariance.text = ""
+            tvVariance.setBackgroundColor(Color.parseColor("#EEEEEE"))
 
             fun updateVariance() {
+                try{
                 val countedStr = etCounted.text.toString().trim()
                 if (countedStr.isEmpty()) {
                     entry.counted = null
                     entry.variance = null
                     tvVariance.text = ""
                     tvVariance.setBackgroundColor(Color.parseColor("#EEEEEE"))
-                    tvVariance.setTextColor(Color.GRAY)
                 } else {
                     val countedVal = countedStr.toIntOrNull() ?: 0
                     entry.counted = countedVal
@@ -322,6 +301,7 @@ class StockTakeActivity : AppCompatActivity() {
                     }
                 }
                 updateSummary()
+                }catch(_:Exception){}
             }
 
             etCounted.addTextChangedListener(object : TextWatcher {
@@ -338,14 +318,15 @@ class StockTakeActivity : AppCompatActivity() {
 
             container.addView(row)
         }
-        tvCount.text = "${list.size} products from Stock List | Take: $currentTakeName"
+        tvCount.text = "${list.size} products | Take: $currentTakeName"
         updateSummary()
+        }catch(e:Exception){ Toast.makeText(this,"Render error",Toast.LENGTH_SHORT).show() }
     }
 
     private fun updateSummary() {
+        try{
         var totalOnHand = 0
         var totalCounted = 0
-        var totalVariance = 0
         var countedItems = 0
         var ok = 0
         var over = 0
@@ -355,7 +336,6 @@ class StockTakeActivity : AppCompatActivity() {
             if (e.counted != null) {
                 countedItems++
                 totalCounted += e.counted!!
-                totalVariance += e.variance ?: 0
                 when {
                     e.variance == 0 -> ok++
                     (e.variance ?: 0) > 0 -> over++
@@ -363,10 +343,12 @@ class StockTakeActivity : AppCompatActivity() {
                 }
             }
         }
-        tvSummary.text = "On Hand: $totalOnHand | Counted: $totalCounted ($countedItems items) | Var: $totalVariance | ✅ $ok 🔵 $over 🔴 $shortage"
+        tvSummary.text = "On Hand: $totalOnHand | Counted: $totalCounted ($countedItems items) | OK:$ok OVER:$over SHORT:$shortage"
+        }catch(_:Exception){}
     }
 
     private fun saveAndOverride() {
+        try{
         if (!takeStarted || currentTakeName.isEmpty()) {
             Toast.makeText(this, "Enter Stock Take Name and START first", Toast.LENGTH_SHORT).show()
             return
@@ -377,7 +359,6 @@ class StockTakeActivity : AppCompatActivity() {
             return
         }
 
-        // 1. Override available stocks - update goods_received, stock_data, products
         val goodsPrefs = getSharedPreferences("goods_received", MODE_PRIVATE)
         val stockPrefs = getSharedPreferences("stock_data", MODE_PRIVATE)
         val productsPrefs = getSharedPreferences("products", MODE_PRIVATE)
@@ -402,7 +383,6 @@ class StockTakeActivity : AppCompatActivity() {
         stockEdit.apply()
         prodEdit.apply()
 
-        // 2. Save this stock take history with name e.g. January Stock Take
         val historyPrefs = getSharedPreferences("stock_take_history", MODE_PRIVATE)
         val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
         val key = "${currentTakeName}_${dateStr}".replace(" ", "_")
@@ -414,12 +394,7 @@ class StockTakeActivity : AppCompatActivity() {
         }
         historyPrefs.edit().putString(key, sb.toString()).apply()
 
-        // Also save last take name
-        getSharedPreferences("stock_take", MODE_PRIVATE).edit()
-            .putString("last_take_name", currentTakeName)
-            .putString("last_take_date", dateStr)
-            .apply()
-
         Toast.makeText(this, "Saved '$currentTakeName' and OVERRIDED stock - ${allEntries.count { it.counted != null }} items", Toast.LENGTH_LONG).show()
+        }catch(e:Exception){ Toast.makeText(this,"Save error: ${e.message}",Toast.LENGTH_LONG).show() }
     }
 }
