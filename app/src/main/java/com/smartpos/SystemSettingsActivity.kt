@@ -19,6 +19,7 @@ class SystemSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try{
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.parseColor("#F5F5F5"))
@@ -35,7 +36,7 @@ class SystemSettingsActivity : AppCompatActivity() {
         header.addView(title)
 
         val scroll = ScrollView(this)
-        val lpScroll = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+        val lpScroll = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         scroll.layoutParams = lpScroll
         val container = LinearLayout(this)
         container.orientation = LinearLayout.VERTICAL
@@ -61,35 +62,35 @@ class SystemSettingsActivity : AppCompatActivity() {
         fun createEdit(h: String): EditText{
             val et = EditText(this)
             et.hint = h
-            et.setBackgroundResource(android.R.drawable.editbox_background)
             et.setPadding(25,25,25,25)
+            et.setBackgroundColor(Color.parseColor("#FFFFFF"))
             val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             lp.setMargins(0,8,0,8)
             et.layoutParams = lp
             return et
         }
 
-        val shopBox = createSection("🏪 SHOP INFORMATION")
+        val shopBox = createSection("SHOP INFORMATION")
         etShopName = createEdit("Shop Name")
         etShopAddress = createEdit("Shop Address")
         etShopPhone = createEdit("Shop Phone")
         shopBox.addView(etShopName); shopBox.addView(etShopAddress); shopBox.addView(etShopPhone)
 
-        val finBox = createSection("💰 CURRENCY & TAX")
+        val finBox = createSection("CURRENCY & TAX")
         etCurrency = createEdit("Currency e.g. USD")
         etTax = createEdit("Tax % e.g. 15")
         finBox.addView(etCurrency); finBox.addView(etTax)
 
-        val recBox = createSection("🧾 RECEIPT")
+        val recBox = createSection("RECEIPT")
         etReceiptFooter = createEdit("Receipt Footer Message")
         recBox.addView(etReceiptFooter)
 
-        val userBox = createSection("👤 DEFAULT CASHIER")
+        val userBox = createSection("DEFAULT CASHIER")
         etCashier = createEdit("Default Cashier Name")
         userBox.addView(etCashier)
 
         val btnSave = Button(this)
-        btnSave.text = "💾 SAVE ALL SETTINGS"
+        btnSave.text = "SAVE ALL SETTINGS"
         btnSave.setBackgroundColor(Color.parseColor("#0D47A1"))
         btnSave.setTextColor(Color.WHITE)
 
@@ -116,9 +117,10 @@ class SystemSettingsActivity : AppCompatActivity() {
         etCurrency.setText(prefs.getString("currency","USD"))
         etTax.setText(prefs.getString("tax_rate","15"))
         etReceiptFooter.setText(prefs.getString("receipt_footer","Thank you!"))
-        etCashier.setText(prefs.getString("cashier_name", prefs.getString("logged_user","")))
+        etCashier.setText(prefs.getString("cashier_name", prefs.getString("logged_user","") ?: ""))
 
         btnSave.setOnClickListener{
+            try{
             val n = etShopName.text.toString().trim()
             if(n.isEmpty()){
                 etShopName.error="Enter shop name"
@@ -135,12 +137,16 @@ class SystemSettingsActivity : AppCompatActivity() {
                 .putString("last_settings_update", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
                 .apply()
             Toast.makeText(this,"Settings Saved!",Toast.LENGTH_LONG).show()
+            }catch(e:Exception){ Toast.makeText(this,"Save error: ${e.message}",Toast.LENGTH_LONG).show() }
         }
 
         btnReset.setOnClickListener{
+            try{
             prefs.edit().putString("shop_name","").putString("shop_address","").putString("shop_phone","").putString("currency","USD").putString("tax_rate","15").apply()
             etShopName.setText(""); etShopAddress.setText(""); etShopPhone.setText(""); etCurrency.setText("USD"); etTax.setText("15")
             Toast.makeText(this,"Reset Done",Toast.LENGTH_SHORT).show()
+            }catch(_:Exception){}
         }
+        }catch(e:Exception){ Toast.makeText(this,"Init error: ${e.message}",Toast.LENGTH_LONG).show(); finish() }
     }
 }
