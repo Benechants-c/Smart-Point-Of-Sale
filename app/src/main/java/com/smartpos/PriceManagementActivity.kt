@@ -22,6 +22,7 @@ class PriceManagementActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try{
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.parseColor("#F5F5F5"))
@@ -39,7 +40,7 @@ class PriceManagementActivity : AppCompatActivity() {
 
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val prefs = getSharedPreferences("pos_prefs", MODE_PRIVATE)
-        val cashier = prefs.getString("cashier_name", "Cashier")
+        val cashier = prefs.getString("cashier_name", "Cashier") ?: "Cashier"
         val tvHead = TextView(this)
         tvHead.text = "Cashier: $cashier | ${sdf.format(Date())}"
         tvHead.setTextColor(Color.parseColor("#E1BEE7"))
@@ -51,9 +52,9 @@ class PriceManagementActivity : AppCompatActivity() {
         searchBox.setBackgroundColor(Color.WHITE)
         searchBox.setPadding(15,15,15,15)
         etSearch = EditText(this)
-        etSearch.hint = "🔍 Search Code or Description..."
-        etSearch.setBackgroundResource(android.R.drawable.editbox_background)
+        etSearch.hint = "Search Code or Description..."
         etSearch.setPadding(25,25,25,25)
+        etSearch.setBackgroundColor(Color.parseColor("#FFFFFF"))
         tvCount = TextView(this)
         tvCount.textSize = 12f
         tvCount.setTextColor(Color.GRAY)
@@ -68,7 +69,7 @@ class PriceManagementActivity : AppCompatActivity() {
         tvSummary.textSize = 12f
         tvSummary.setTypeface(null, Typeface.BOLD)
         val legend = TextView(this)
-        legend.text = "🔴 Low <0% | 🟢 Good 0-50% | 🔵 High >50%"
+        legend.text = "Low <0% | Good 0-50% | High >50%"
         legend.textSize = 11f
         summaryBox.addView(tvSummary)
         summaryBox.addView(legend)
@@ -96,7 +97,7 @@ class PriceManagementActivity : AppCompatActivity() {
         scroll.addView(container)
 
         val btnSave = Button(this)
-        btnSave.text = "💾 SAVE NEW PRICES"
+        btnSave.text = "SAVE NEW PRICES"
         btnSave.setBackgroundColor(Color.parseColor("#4A148C"))
         btnSave.setTextColor(Color.WHITE)
 
@@ -122,9 +123,11 @@ class PriceManagementActivity : AppCompatActivity() {
             }
             override fun afterTextChanged(s: Editable?){}
         })
+        }catch(e:Exception){ Toast.makeText(this,"Init error: ${e.message}",Toast.LENGTH_LONG).show() }
     }
 
     private fun loadData(){
+        try{
         allEntries.clear()
         val combined = mutableMapOf<String, Any?>()
         for(name in listOf("goods_received","products","stock_data")){
@@ -148,9 +151,11 @@ class PriceManagementActivity : AppCompatActivity() {
         if(allEntries.isEmpty()){
             allEntries.add(PEntry(PStock("001","Sample Product",10,5.0,7.0), null))
         }
+        }catch(_:Exception){ allEntries.add(PEntry(PStock("001","Sample Product",10,5.0,7.0), null)) }
     }
 
     private fun render(list: List<PEntry>){
+        try{
         container.removeAllViews()
         for(entry in list){
             val row = LinearLayout(this)
@@ -169,26 +174,25 @@ class PriceManagementActivity : AppCompatActivity() {
 
             val tvOld = TextView(this)
             tvOld.text = "$${String.format("%.2f", entry.stock.selling)}"
-            tvOld.gravity = android.view.Gravity.CENTER
             tvOld.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
 
             val etNew = EditText(this)
             etNew.hint = "new"
             etNew.textSize = 12f
-            etNew.setBackgroundResource(android.R.drawable.editbox_background)
-            etNew.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            etNew.setBackgroundColor(Color.parseColor("#FFFFFF"))
+            etNew.setPadding(10,10,10,10)
             etNew.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             if(entry.newPrice!=null) etNew.setText("${entry.newPrice}")
 
             val tvPerc = TextView(this)
             tvPerc.textSize = 11f
             tvPerc.setTypeface(null, Typeface.BOLD)
-            tvPerc.gravity = android.view.Gravity.CENTER
             tvPerc.setPadding(5,8,5,8)
             tvPerc.setBackgroundColor(Color.parseColor("#EEEEEE"))
             tvPerc.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f)
 
             fun updatePerc(){
+                try{
                 val ns = etNew.text.toString().trim()
                 if(ns.isEmpty()){
                     entry.newPrice=null
@@ -216,6 +220,7 @@ class PriceManagementActivity : AppCompatActivity() {
                     tvPerc.text = "+" + String.format("%.1f%% HIGH", perc)
                 }
                 updateSummary()
+                }catch(_:Exception){}
             }
 
             etNew.addTextChangedListener(object: TextWatcher{
@@ -229,9 +234,11 @@ class PriceManagementActivity : AppCompatActivity() {
         }
         tvCount.text = "${list.size} products"
         updateSummary()
+        }catch(e:Exception){ Toast.makeText(this,"Render error",Toast.LENGTH_SHORT).show() }
     }
 
     private fun updateSummary(){
+        try{
         var changed=0; var low=0; var good=0; var high=0
         for(e in allEntries){
             if(e.newPrice!=null){
@@ -240,10 +247,12 @@ class PriceManagementActivity : AppCompatActivity() {
                 if(perc<0) low++ else if(perc<=50) good++ else high++
             }
         }
-        tvSummary.text="Changed:$changed | 🔴 Low:$low | 🟢 Good:$good | 🔵 High:$high"
+        tvSummary.text="Changed:$changed | Low:$low | Good:$good | High:$high"
+        }catch(_:Exception){}
     }
 
     private fun savePrices(){
+        try{
         if(allEntries.none{it.newPrice!=null}){
             Toast.makeText(this,"Enter new price",Toast.LENGTH_SHORT).show()
             return
@@ -268,5 +277,6 @@ class PriceManagementActivity : AppCompatActivity() {
         Toast.makeText(this,"Saved $saved prices",Toast.LENGTH_LONG).show()
         loadData()
         render(allEntries)
+        }catch(e:Exception){ Toast.makeText(this,"Save error: ${e.message}",Toast.LENGTH_LONG).show() }
     }
 }
