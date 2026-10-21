@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.min
 
-data class ReportsActivity (val date: String, val code: String, val product: String, val qty: Int, val cost: Double, val selling: Double)
+data class SaleRecord(val date: String, val code: String, val product: String, val qty: Int, val cost: Double, val selling: Double)
 
 class SimpleBarChartView(context: Context, private val label1: String, private val value1: Double, private val label2: String, private val value2: Double) : View(context) {
     private val paintBar1 = Paint().apply { color = Color.parseColor("#4527A0"); style = Paint.Style.FILL; isAntiAlias = true }
