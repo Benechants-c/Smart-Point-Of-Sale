@@ -1,14 +1,14 @@
 package com.smartpos
+import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuditLogActivity : AppCompatActivity() {
+class AuditLogActivity : Activity() {
     data class AuditItem(val account: String, val dateTime: String, val action: String, val details: String, val type: String)
     private lateinit var container: LinearLayout
     private lateinit var etSearch: EditText
@@ -34,7 +34,6 @@ class AuditLogActivity : AppCompatActivity() {
         header.addView(title)
 
         val prefs = getSharedPreferences("pos_prefs", MODE_PRIVATE)
-        val cashier = prefs.getString("cashier_name", "System") ?: "System"
 
         val searchBox = LinearLayout(this)
         searchBox.orientation = LinearLayout.VERTICAL
