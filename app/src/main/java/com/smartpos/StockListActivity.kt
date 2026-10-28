@@ -1,11 +1,11 @@
 package com.smartpos
 
+import android.app.Activity
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import android.graphics.Color
 import android.graphics.Typeface
 import java.text.SimpleDateFormat
@@ -14,7 +14,7 @@ import java.util.*
 // UNIQUE NAME - NO DUPLICATE WITH StockTake or Reports
 data class StockListItem(val code: String, val name: String, var qty: Int, val cost: Double, val selling: Double)
 
-class StockListActivity : AppCompatActivity() {
+class StockListActivity : Activity() {
 
     private lateinit var etSearch: EditText
     private lateinit var productContainer: LinearLayout
