@@ -1,11 +1,11 @@
 package com.smartpos
 
+import android.app.Activity
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import android.graphics.Color
 import android.graphics.Typeface
 import java.text.SimpleDateFormat
@@ -19,7 +19,7 @@ data class CustomerItem(
     val createdDate: String
 )
 
-class CustomersActivity : AppCompatActivity() {
+class CustomersActivity : Activity() {
 
     private lateinit var etName: EditText
     private lateinit var etPhone: EditText
@@ -75,7 +75,7 @@ class CustomersActivity : AppCompatActivity() {
             setPadding(20,20,20,20)
         }
         val addTitle = TextView(this).apply {
-            text = "➕ Add New Customer"
+            text = "Add New Customer"
             textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.parseColor("#00796B"))
@@ -125,7 +125,7 @@ class CustomersActivity : AppCompatActivity() {
             setPadding(15,15,15,15)
         }
         etSearch = EditText(this).apply {
-            hint = "🔍 Search by Name / Phone / Location..."
+            hint = "Search by Name / Phone / Location..."
             setBackgroundColor(Color.WHITE)
             setBackgroundResource(android.R.drawable.editbox_background)
             setPadding(25,25,25,25)
