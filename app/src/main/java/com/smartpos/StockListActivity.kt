@@ -11,10 +11,9 @@ import android.graphics.Typeface
 import java.text.SimpleDateFormat
 import java.util.*
 
-// UNIQUE NAME - NO DUPLICATE WITH StockTake or Reports
-data class StockListItem(val code: String, val name: String, var qty: Int, val cost: Double, val selling: Double)
-
 class StockListActivity : Activity() {
+
+    data class StockListItem(val code: String, val name: String, var qty: Int, val cost: Double, val selling: Double)
 
     private lateinit var etSearch: EditText
     private lateinit var productContainer: LinearLayout
