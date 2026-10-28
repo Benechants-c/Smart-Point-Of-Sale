@@ -1,14 +1,14 @@
 package com.smartpos
+import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
-class SystemSettingsActivity : AppCompatActivity() {
+class SystemSettingsActivity : Activity() {
     private lateinit var etShopName: EditText
     private lateinit var etShopAddress: EditText
     private lateinit var etShopPhone: EditText
@@ -44,14 +44,14 @@ class SystemSettingsActivity : AppCompatActivity() {
         scroll.addView(container)
 
         fun createSection(t: String): LinearLayout{
-            val box = LinearLayout(this)
+            val box = LinearLayout(this@SystemSettingsActivity)
             box.orientation = LinearLayout.VERTICAL
             box.setBackgroundColor(Color.WHITE)
             box.setPadding(20,20,20,20)
             val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             lp.setMargins(0,0,0,20)
             box.layoutParams = lp
-            val tv = TextView(this)
+            val tv = TextView(this@SystemSettingsActivity)
             tv.text = t
             tv.textSize = 14f
             tv.setTypeface(null, Typeface.BOLD)
@@ -60,7 +60,7 @@ class SystemSettingsActivity : AppCompatActivity() {
         }
 
         fun createEdit(h: String): EditText{
-            val et = EditText(this)
+            val et = EditText(this@SystemSettingsActivity)
             et.hint = h
             et.setPadding(25,25,25,25)
             et.setBackgroundColor(Color.parseColor("#FFFFFF"))
