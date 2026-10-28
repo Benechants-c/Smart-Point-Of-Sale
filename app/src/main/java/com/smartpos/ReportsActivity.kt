@@ -1,12 +1,12 @@
 package com.smartpos
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.*
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.min
@@ -65,7 +65,7 @@ class ReportPieChartView(context: Context, private val data: List<Pair<String, D
     }
 }
 
-class ReportsActivity : AppCompatActivity() {
+class ReportsActivity : Activity() {
     private lateinit var container: LinearLayout
     private lateinit var graphContainer: LinearLayout
     private lateinit var tvTotalSales: TextView
