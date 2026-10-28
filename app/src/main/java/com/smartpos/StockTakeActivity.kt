@@ -1,11 +1,11 @@
 package com.smartpos
 
+import android.app.Activity
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import android.graphics.Color
 import android.graphics.Typeface
 import java.text.SimpleDateFormat
@@ -15,7 +15,7 @@ import java.util.*
 data class TakeStock(val code: String, val name: String, val qty: Int, val cost: Double, val selling: Double)
 data class TakeEntry(val stockItem: TakeStock, var counted: Int? = null, var variance: Int? = null)
 
-class StockTakeActivity : AppCompatActivity() {
+class StockTakeActivity : Activity() {
 
     private lateinit var etTakeName: EditText
     private lateinit var container: LinearLayout
