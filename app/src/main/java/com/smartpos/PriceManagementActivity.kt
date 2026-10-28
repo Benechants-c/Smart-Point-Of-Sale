@@ -1,4 +1,5 @@
 package com.smartpos
+import android.app.Activity
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -6,11 +7,10 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
-class PriceManagementActivity : AppCompatActivity() {
+class PriceManagementActivity : Activity() {
     data class PStock(val code: String, val name: String, val qty: Int, val cost: Double, val selling: Double)
     data class PEntry(val stock: PStock, var newPrice: Double? = null)
 
