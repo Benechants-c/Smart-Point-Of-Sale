@@ -18,14 +18,17 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Grant execute permission
-        run: chmod +x gradlew
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Find gradlew and build
+        run: |
+          GRADLEW=$(find . -name gradlew | head -n 1)
+          echo "Found: $GRADLEW"
+          chmod +x "$GRADLEW"
+          DIR=$(dirname "$GRADLEW")
+          cd "$DIR" && ./gradlew assembleDebug
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0-${{ github.run_number }}
           name: Smart POS v1.0-${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
-          body: Latest Smart POS APK - Main Menu fixed
+          files: "**/build/outputs/apk/debug/app-debug.apk"
+          body: Latest Smart POS APK
