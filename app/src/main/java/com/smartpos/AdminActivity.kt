@@ -21,31 +21,35 @@ class AdminActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
+            val settings = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val shopName = settings.getString("shop_name", "") ?: ""
+            val displayShopName = if (shopName.isBlank()) "POS" else shopName
+
             val scroll = ScrollView(this)
             val root = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setBackgroundColor(Color.parseColor("#F8FAFC"))
             }
+
+            // HEADER - No hardcoded shop name, comes from Settings
             val header = LinearLayout(this).apply {
                 setBackgroundColor(Color.parseColor("#1E293B"))
                 setPadding(30,40,30,30)
                 orientation = LinearLayout.HORIZONTAL
             }
             val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
-            headerText.addView(TextView(this).apply { text = "🏪 Smartpos"; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
-            headerText.addView(TextView(this).apply { text = "Admin Dashboard • Main Shop"; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")) })
+            headerText.addView(TextView(this).apply { text = displayShopName; textSize = 20f; setTypeface(null, Typeface.BOLD); setTextColor(Color.WHITE) })
+            headerText.addView(TextView(this).apply { text = "Main Menu"; textSize = 12f; setTextColor(Color.parseColor("#94A3B8")) })
             header.addView(headerText)
             root.addView(header)
 
             var todaySales = 0f; var profit = 0f; var stockValue = 0f; var lowStock = 0; var prodCount = 0; var custCount = 0
-            var debugInfo = ""
 
             try{
                 val salesPrefs = listOf("sales_main","sales_rukudzo","sales","sales_db","todays_sales")
                 for(spName in salesPrefs){
                     try{
                         val pref = getSharedPreferences(spName, Context.MODE_PRIVATE)
-                        if(pref.all.isNotEmpty()) debugInfo += "$spName:${pref.all.size} "
                         for((_,v) in pref.all){
                             try{
                                 val parts = v.toString().split("|")
@@ -62,7 +66,6 @@ class AdminActivity : Activity() {
             }catch(_:Exception){}
 
             try{
-                // SAFE LIST - NO FILE SCAN (this fixes build error)
                 val possibleFiles = listOf(
                     "products_main","products_rukudzo","stock_main","products_db","products",
                     "stock_rukudzo","products_main_branch","stock","inventory",
@@ -70,12 +73,10 @@ class AdminActivity : Activity() {
                 )
                 val seen = HashSet<String>()
                 allStockItems.clear()
-                var foundFiles = ""
                 for(prefName in possibleFiles){
                     try{
                         val pref = getSharedPreferences(prefName, Context.MODE_PRIVATE)
                         if(pref.all.isEmpty()) continue
-                        foundFiles += "$prefName=${pref.all.size} "
                         for((k,v) in pref.all){
                             try{
                                 if(seen.contains(k)) continue
@@ -92,9 +93,6 @@ class AdminActivity : Activity() {
                                         sku = o.optString("sku", o.optString("barcode", k.take(8)))
                                         qty = o.optInt("quantity", o.optInt("qty", 1))
                                         sell = o.optDouble("price", o.optDouble("sellPrice", 0.0)).toFloat()
-                                        val cost = o.optDouble("cost",0.0).toFloat()
-                                        if(sell==0f) sell = cost * 1.3f
-                                        if(sell==0f) sell = 10f
                                     }catch(_:Exception){ continue }
                                 } else {
                                     val p = raw.split("|")
@@ -117,8 +115,7 @@ class AdminActivity : Activity() {
                         }
                     }catch(_:Exception){}
                 }
-                debugInfo += " | Found: $foundFiles"
-            }catch(e:Exception){ debugInfo += " Err:${e.message}" }
+            }catch(_:Exception){}
 
             try{
                 for(cName in listOf("customers","customers_db","customer_list")){
@@ -127,9 +124,10 @@ class AdminActivity : Activity() {
             }catch(_:Exception){}
 
             val prefsCash = getSharedPreferences("cash", Context.MODE_PRIVATE)
-            val drawer = prefsCash.getFloat("drawer", 5.0f)
+            val drawer = prefsCash.getFloat("drawer", 0f)
             val autoDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 
+            // OVERVIEW
             val dateRow = LinearLayout(this).apply {
                 setPadding(24,16,24,16)
                 orientation = LinearLayout.HORIZONTAL
@@ -171,10 +169,10 @@ class AdminActivity : Activity() {
             }
 
             val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
-            row1.addView(kpiCard("#BBF7D0","📈","Today's Sales","$${String.format("%.2f",todaySales)}","+ REAL","#16A34A"){ openSection("Sales Management") })
-            row1.addView(kpiCard("#BFDBFE","💰","Profit","$${String.format("%.2f",profit)}","REAL PROFIT","#2563EB"){ openSection("Reports") })
+            row1.addView(kpiCard("#BBF7D0","📈","Today's Sales","$${String.format("%.2f",todaySales)}","","#16A34A"){ openSection("Transactions") })
+            row1.addView(kpiCard("#BFDBFE","💰","Profit","$${String.format("%.2f",profit)}","","#2563EB"){ openSection("Reports") })
             row1.addView(kpiCard("#DDD6FE","🏠","Stock Value","$${String.format("%.0f",stockValue)}","Tap → Details","#7C3AED"){
-                val msg = "Total Stock Value: $${String.format("%.2f",stockValue)}\n${prodCount} products\n${debugInfo}"
+                val msg = "Total Stock Value: $${String.format("%.2f",stockValue)}\n$prodCount products"
                 android.app.AlertDialog.Builder(this).setTitle("Stock Value").setMessage(msg).setPositiveButton("View Stock"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
             })
 
@@ -182,44 +180,22 @@ class AdminActivity : Activity() {
             row2.addView(kpiCard(if(lowStock>0)"#FECACA" else "#BBF7D0", if(lowStock>0)"⚠️" else "✅","Low Stock", if(lowStock>0) "$lowStock Items" else "0 Items", if(lowStock>0)"Needs restock" else "All OK", if(lowStock>0)"#DC2626" else "#16A34A"){
                 var lowList = ""
                 for(item in allStockItems.filter{it.qty<5}.take(10)){ lowList += "${item.name}: ${item.qty}\n" }
-                if(lowList.isEmpty() && prodCount>0) lowList = "All ${prodCount} products OK (5+ qty)"
-                if(prodCount==0) lowList = "No products found\n$debugInfo"
-                android.app.AlertDialog.Builder(this).setTitle("Low Stock").setMessage(lowList).setPositiveButton("Restock"){_,_-> safeOpen(ReceiveStockActivity::class.java)}.setNegativeButton("Close",null).show()
+                if(lowList.isEmpty() && prodCount>0) lowList = "All $prodCount products OK (5+ qty)"
+                if(prodCount==0) lowList = "No products found"
+                android.app.AlertDialog.Builder(this).setTitle("Low Stock").setMessage(lowList).setPositiveButton("View Stock"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
             })
-            row2.addView(kpiCard("#A5F3FC","📦","Products","$prodCount","Tap → SKUs","#0F172A"){
-                var list = ""
-                for(item in allStockItems.take(15)){ list += "${item.sku} - ${item.name} (${item.qty})\n" }
-                if(list.isEmpty()) list = "No products\n$debugInfo"
-                android.app.AlertDialog.Builder(this).setTitle("Products $prodCount SKUs").setMessage(list).setPositiveButton("View All"){_,_-> safeOpen(StockListActivity::class.java)}.setNegativeButton("Close",null).show()
+            row2.addView(kpiCard("#A5F3FC","📦","Products","$prodCount","Tap → List","#0F172A"){
+                safeOpen(StockListActivity::class.java)
             })
-            row2.addView(kpiCard("#FED7AA","👥","Customers","$custCount", if(custCount>0) "REAL" else "Tap to add","#EA580C"){ safeOpen(CustomersActivity::class.java) })
+            row2.addView(kpiCard("#FED7AA","👥","Customers","$custCount","","#EA580C"){ safeOpen(CustomersActivity::class.java) })
 
             overviewContainer.addView(row1)
             overviewContainer.addView(row2)
-            overviewContainer.addView(TextView(this).apply{ text="DEBUG: $debugInfo | Items:${allStockItems.size}"; textSize=9f; setTextColor(Color.GRAY); setPadding(16,8,16,8); setBackgroundColor(Color.parseColor("#F1F5F9")) })
             root.addView(overviewContainer)
 
-            root.addView(TextView(this).apply { text = "Quick Actions"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
-            fun quickRow(b1:Button, b2:Button, b3:Button): LinearLayout {
-                val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(12,0,12,0) }
-                b1.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b2.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}; b3.layoutParams = LinearLayout.LayoutParams(0,-2,1f).apply{setMargins(6,6,6,6)}
-                r.addView(b1); r.addView(b2); r.addView(b3); return r
-            }
-            fun qBtn(text:String, color:String, action:()->Unit): Button {
-                return Button(this).apply { this.text = text; setBackgroundColor(Color.parseColor(color)); setTextColor(Color.WHITE); textSize = 11f; setOnClickListener{ action() } }
-            }
-            root.addView(quickRow(
-                qBtn("🚚 + RECEIVE STOCK","#2563EB"){ safeOpen(ReceiveStockActivity::class.java) },
-                qBtn("📦 + ADD PRODUCT","#22C55E"){ safeOpen(StockListActivity::class.java) },
-                qBtn("🛒 + NEW SALE","#A855F7"){ safeOpen(SalesActivity::class.java) }
-            ))
-            root.addView(quickRow(
-                qBtn("🔄 STOCK TRANSFER","#0D9488"){ safeOpen(StockTransferActivity::class.java) },
-                qBtn("🏢 ADD SUPPLIER","#FB923C"){ safeOpen(ManageShopsActivity::class.java) },
-                qBtn("👤 + ADD USER","#1E293B"){ safeOpen(UsersActivity::class.java) }
-            ))
+            // ===== NEW MAIN MENU - 7 BUTTONS ONLY =====
+            root.addView(TextView(this).apply { text = "Main Menu"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
 
-            root.addView(TextView(this).apply { text = "Admin Menu"; textSize = 16f; setTypeface(null, Typeface.BOLD); setPadding(24,16,24,8) })
             fun menuGroup(title:String, icon:String, items:List<Pair<String,String>>): LinearLayout {
                 val group = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,16,16,16); layoutParams = LinearLayout.LayoutParams(-1,-2).apply{setMargins(16,8,16,8)} }
                 group.addView(TextView(this).apply { text = "$icon $title"; textSize = 15f; setTypeface(null, Typeface.BOLD); setTextColor(Color.parseColor("#0F172A")) })
@@ -233,22 +209,72 @@ class AdminActivity : Activity() {
                 }
                 return group
             }
-            root.addView(menuGroup("Sales","📊", listOf(Pair("Sales Management","Sales Management"),Pair("Customers","Customers"),Pair("Cash Drawer $"+String.format("%.2f",drawer),"Cash Management"),Pair("Stock Take Sheet","StockTake"))))
-            root.addView(menuGroup("Management","⚙️", listOf(Pair("Users & Permissions","Users & Permissions"),Pair("Branches / Shops","Branches / Shops"),Pair("Stock & Purchasing","Purchasing"),Pair("View Stock (All Shops)","StockList"))))
-            root.addView(menuGroup("Analytics","📈", listOf(Pair("Reports (Sales/Profit/Stock)","Reports"),Pair("Audit Log","Audit Log"),Pair("Price Management","Price Management"),Pair("System Settings","System Settings"))))
+
+            // 1. NEW SALE - Search by Name or Code, handled in SalesActivity
+            root.addView(menuGroup("New Sale","🛒", listOf(
+                Pair("New Sale","New Sale")
+            )))
+            // 2. MANAGE SALES - Transactions + Daily Sales Summary + Z
+            root.addView(menuGroup("Manage Sales","🧾", listOf(
+                Pair("Transactions","Transactions"),
+                Pair("Daily Sales Summary","Daily Sales Summary")
+            )))
+            // 3. PRODUCTS - View Only
+            root.addView(menuGroup("Products","📦", listOf(
+                Pair("View Products","View Products"),
+                Pair("Low Stock","Low Stock")
+            )))
+            // 4. INVENTORY - View Only
+            root.addView(menuGroup("Inventory","🏠", listOf(
+                Pair("Current Stock","Current Stock"),
+                Pair("Low Stock","Low Stock")
+            )))
+            // 5. REPORTS
+            root.addView(menuGroup("Reports","📈", listOf(
+                Pair("Daily Sales Report","Reports"),
+                Pair("Z Report","Z Report"),
+                Pair("X Report","X Report")
+            )))
+            // 6. SETTINGS - Manager Only, all empty by default
+            root.addView(menuGroup("Settings","⚙️", listOf(
+                Pair("Printer Settings","Printer Settings"),
+                Pair("Receipt Settings","Receipt Settings"),
+                Pair("Device Settings","Device Settings"),
+                Pair("Cash Drawer Settings","Cash Drawer Settings"),
+                Pair("Sound ON/OFF","Sound Settings"),
+                Pair("Change PIN","Change PIN")
+            )))
+            // 7. BACK OFFICE - Opens Web Admin URL from Settings
+            root.addView(menuGroup("Back Office","🌐", listOf(
+                Pair("Open Web Admin","Back Office"),
+                Pair("Sync Status","Sync Status")
+            )))
 
             scroll.addView(root); setContentView(scroll)
         } catch (e: Exception) {
-            val tv = TextView(this); tv.text = "Admin Error: "+e.message; setContentView(tv)
+            val tv = TextView(this); tv.text = "Error: "+e.message; setContentView(tv)
         }
     }
 
     private fun safeOpen(clazz: Class<*>){
         try{ startActivity(Intent(this, clazz)) }catch(e:Exception){ Toast.makeText(this,"Open ${clazz.simpleName}: ${e.message}",1).show() }
     }
+
     private fun openSection(title:String){
         try{
             when{
+                title == "New Sale" -> { safeOpen(SalesActivity::class.java); return }
+                title == "Transactions" || title == "Daily Sales Summary" -> { safeOpen(SalesActivity::class.java); return }
+                title == "View Products" || title == "Current Stock" || title == "Low Stock" -> { safeOpen(StockListActivity::class.java); return }
+                title == "Reports" || title == "Z Report" || title == "X Report" -> { safeOpen(ReportsActivity::class.java); return }
+                title == "Printer Settings" || title == "Receipt Settings" || title == "Device Settings" || title == "Cash Drawer Settings" || title == "Sound Settings" || title == "Change PIN" -> { safeOpen(SystemSettingsActivity::class.java); return }
+                title == "Back Office" -> {
+                    val adminUrl = getSharedPreferences("settings", Context.MODE_PRIVATE).getString("admin_url", "") ?: ""
+                    if(adminUrl.isNotBlank()) startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(adminUrl)))
+                    else Toast.makeText(this, "Enter Admin URL in Settings", 1).show()
+                    return
+                }
+                title == "Sync Status" -> { safeOpen(SystemSettingsActivity::class.java); return }
                 title.contains("User") -> { safeOpen(UsersActivity::class.java); return }
                 title.contains("Branch") -> { safeOpen(BranchesActivity::class.java); return }
                 title.contains("Purchasing") || title.contains("Supplier") -> { safeOpen(StockPurchasingActivity::class.java); return }
